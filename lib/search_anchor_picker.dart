@@ -1,69 +1,62 @@
 import 'dart:async';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:generic_search_selector/overlay_body.dart';
 import 'package:generic_search_selector/picker_config.dart';
 
-import 'default_tooltip.dart';
-
-/// Scope available only inside picker overlay (header + list tiles).
-class PickerScope<T> extends InheritedWidget {
-  const PickerScope({
-    super.key,
-    required super.child,
-    required this.pending,
-    required this.setPending,
-    required this.toggleId,
+/// Actions exposed to headerBuilder so callers never need InheritedWidget lookups.
+///
+/// This is intentionally thin:
+/// - It operates on the in-overlay pending selection only.
+/// - It never calls setState; it only updates [pendingN] and closes the picker.
+class PickerActions<T> {
+  PickerActions({
+    required this.pendingN,
+    required this.idOf,
     required this.close,
-    required this.openSubmenu,
-    required this.config,
-    required this.allItems,
     required this.mode,
+    required this.getKey,
   });
 
-  final Set<int> pending;
-  final void Function(Set<int> ids) setPending;
-
-  final void Function(int id, bool next) toggleId;
-
+  final ValueNotifier<Set<int>> pendingN;
+  final int Function(T) idOf;
   final void Function([String? reason]) close;
-
-  /// Open a submenu picker (closes current view first).
-  final Future<void> Function(
-    PickerConfig<dynamic> config, {
-    required Iterable<int> seedIds,
-    required PickerMode mode,
-    OnFinish? onFinish,
-  })
-  openSubmenu;
-
-  final PickerConfig<T> config;
-  final List<T> allItems;
+  final GlobalKey Function(Object id) getKey;
   final PickerMode mode;
 
-  static PickerScope<T> of<T>(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<PickerScope<T>>();
-    assert(scope != null, 'PickerScope<$T> not found in context');
-    return scope!;
-  }
+  Set<int> get pending => pendingN.value;
 
-  @override
-  bool updateShouldNotify(PickerScope<T> oldWidget) {
-    // pending changes should rebuild header widgets if they read it
-    return pending != oldWidget.pending || allItems != oldWidget.allItems;
+  void setPending(Set<int> ids) => pendingN.value = ids;
+
+  void selectAll(Iterable<int> ids) => setPending(ids.toSet());
+
+  void selectNone() => setPending(<int>{});
+
+  void toggleId(int id, bool next) {
+    final s = {...pending};
+    next ? s.add(id) : s.remove(id);
+    setPending(s);
   }
 }
 
-/// Generic SearchAnchor-based picker (multi-select / radio) with stable
-/// in-overlay state and optional header actions via InheritedWidget scope.
+enum CloseQueryBehavior { keep, clear }
+
+/// Generic SearchAnchor-based picker with stable in-overlay selection.
+///
+/// Key properties:
+/// - **No GlobalKey**
+/// - In-overlay selection stored in [_pendingN] (ValueNotifier)
+/// - External seed ([initialSelectedIds]) is synced only when popup is not open
+/// - Close is always deferred (post-frame) to avoid overlay/build-scope assertions
+/// - Optional [PickerConfig.listenable] allows live updates (e.g. ChangeNotifier repo)
 class SearchAnchorPicker<T> extends StatefulWidget {
   const SearchAnchorPicker({
     super.key,
     required this.config,
     required this.initialSelectedIds,
     this.mode = PickerMode.multi,
+    this.onToggle,
     this.onFinish,
-    this.onToggle, // optional, used for remote update gate
     this.searchController,
     this.triggerBuilder,
     this.triggerChild,
@@ -75,25 +68,26 @@ class SearchAnchorPicker<T> extends StatefulWidget {
     this.headerBuilder,
     this.headerTiles,
     this.selectedFirst,
+    this.closeQueryBehavior = CloseQueryBehavior.keep,
   });
 
   final PickerConfig<T> config;
 
+  /// External seed selection.
+  /// While overlay is open, changes here will NOT clobber pending selection.
   final List<int> initialSelectedIds;
 
   final PickerMode mode;
 
-  /// Called once on close (diff vs open snapshot).
-  final OnFinish? onFinish;
-
-  /// Optional gating for toggles (remote ops).
-  ///
-  /// Return false to reject the UI change.
+  /// Optional gate (e.g. remote ops). Return false to reject UI change.
   final Future<bool> Function(T item, bool nextSelected)? onToggle;
+
+  /// Called once when overlay closes (diff vs open snapshot).
+  final OnFinish? onFinish;
 
   final SearchController? searchController;
 
-  /// If provided, used to build trigger (gets open() and version tick).
+  /// Optional trigger builder (gets open callback + version tick).
   final Widget Function(BuildContext context, VoidCallback open, int version)? triggerBuilder;
 
   final Widget? triggerChild;
@@ -105,156 +99,195 @@ class SearchAnchorPicker<T> extends StatefulWidget {
   final double maxHeight;
   final double minWidth;
 
-  /// Header content (preferred). Has access to PickerScope<T>.
-  final List<Widget> Function(BuildContext context)? headerBuilder;
+  /// Preferred: build header widgets with [PickerActions].
+  final List<Widget> Function(BuildContext context, PickerActions<T> actions, List<T> allItems)?
+  headerBuilder;
 
-  /// Legacy static header tiles (if headerBuilder is null).
+  /// Legacy static header tiles (used if headerBuilder is null).
   final List<Widget>? headerTiles;
 
-  /// Overrides config.selectedFirst if not null.
+  /// Overrides config.selectedFirst if set.
   final bool? selectedFirst;
+
+  final CloseQueryBehavior closeQueryBehavior;
 
   @override
   State<SearchAnchorPicker<T>> createState() => _SearchAnchorPickerState<T>();
 }
 
 class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
-  late final SearchController _ownedController = SearchController();
+  late final SearchController _owned = SearchController();
 
-  SearchController get _ctrl => widget.searchController ?? _ownedController;
+  SearchController get _ctrl => widget.searchController ?? _owned;
 
-  int _refreshTick = 0;
+  late final ValueNotifier<Set<int>> _pendingN = ValueNotifier<Set<int>>(
+    widget.initialSelectedIds.toSet(),
+  );
 
-  // Locked while overlay open:
-  Set<int> _pending = <int>{};
   Set<int> _openedSnapshot = <int>{};
+  bool _open = false;
 
-  // Stable order computed once per open / items refresh:
-  List<T> _stableOrder = const [];
+  int _tick = 0;
+  final ValueNotifier<int> _viewTickN = ValueNotifier(0);
 
-  bool _isOpen = false;
+  /// Stable order is derived from items at open time.
+  /// While open, we keep the *relative* order stable but allow new items to appear.
+  List<int> _stableIds = <int>[];
+
+  VoidCallback? _listenableCb;
+
+  @override
+  void initState() {
+    super.initState();
+    _attachListenable(widget.config.listenable);
+  }
+
+  List<T>? _itemsSnapshot;
+
+  // bool _loading = false; // Unused
+  final Map<Object, GlobalKey> _headerKeys = {};
+
+  GlobalKey _getKey(Object id) {
+    return _headerKeys.putIfAbsent(id, () => GlobalKey());
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    // _loading = true;
+    // Notify overlay to show loading if needed (optional)
+    widget.config.loadItems(context).then((items) {
+      if (!mounted) return;
+      _itemsSnapshot = items;
+      // _loading = false;
+      _viewTickN.value++;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant SearchAnchorPicker<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.config.listenable != widget.config.listenable) {
+      _detachListenable(oldWidget.config.listenable);
+      _attachListenable(widget.config.listenable);
+    }
+
+    // Sync from external seed ONLY when overlay is not open.
+    if (!_open && !_listEqualsInt(oldWidget.initialSelectedIds, widget.initialSelectedIds)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _pendingN.value = widget.initialSelectedIds.toSet();
+      });
+    }
+  }
 
   @override
   void dispose() {
-    if (widget.searchController == null) {
-      _ownedController.dispose();
-    }
+    _detachListenable(widget.config.listenable);
+    _pendingN.dispose();
+    // if (!_open) _viewTickN.dispose();
+    // Same fix as controller: avoid disposing if view is animating out.
+    // _viewTickN.dispose();
+    // if (widget.searchController == null) {
+    // Prevent crash if disposed while overlay is animating out
+    // if (!_open) _owned.dispose();
+    // }
     super.dispose();
   }
 
-  void _open() {
+  void _attachListenable(Listenable? l) {
+    if (l == null) return;
+    _listenableCb = () {
+      if (!mounted) return;
+      // Triggers reload which eventually updates _viewTickN
+      _reload();
+    };
+    l.addListener(_listenableCb!);
+  }
+
+  void _detachListenable(Listenable? l) {
+    if (l == null || _listenableCb == null) return;
+    l.removeListener(_listenableCb!);
+    _listenableCb = null;
+  }
+
+  void _onOpen() {
     _openedSnapshot = widget.initialSelectedIds.toSet();
-    _pending = {..._openedSnapshot};
-    _stableOrder = const [];
-    _isOpen = true;
+    _pendingN.value = {..._openedSnapshot};
+
+    _stableIds = <int>[];
+    _open = true;
+
+    // Load items on open
+    _reload();
+  }
+
+  void _requestOpen() {
+    _onOpen();
     _ctrl.openView();
   }
 
-  void _close([String? reason]) {
-    _ctrl.closeView(reason);
+  void _close([String? _reasonIgnored, bool skipCloseView = false]) {
+    final queryAtClose = _ctrl.text;
+
+    // IMPORTANT: do not pass reason -> it can affect controller text next open.
+    if (!skipCloseView) {
+      _ctrl.closeView('');
+    }
+
+    // Apply query behavior on next frame (avoid build-scope issues).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (widget.closeQueryBehavior == CloseQueryBehavior.clear) {
+        _ctrl.text = '';
+      } else {
+        _ctrl.text = queryAtClose;
+      }
+    });
 
     final before = _openedSnapshot;
-    final after = _pending;
+    final after = _pendingN.value;
 
     final added = after.difference(before).toList();
     final removed = before.difference(after).toList();
 
-    // Finish after frame to avoid "locked tree" type issues.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      _isOpen = false;
+
+      _open = false;
+
+      // Clear header keys on close to release them
+      _headerKeys.clear();
 
       if (widget.onFinish != null) {
         await widget.onFinish!(after.toList(), added: added, removed: removed);
       }
 
       if (!mounted) return;
-      setState(() => _refreshTick++);
+      _viewTickN.value++;
+      setState(() => _tick++);
     });
   }
 
-  void _setPending(Set<int> ids) {
-    setState(() => _pending = ids);
-  }
-
-  void _toggleId(int id, bool next) {
-    final s = {..._pending};
-    next ? s.add(id) : s.remove(id);
-    _setPending(s);
-  }
-
-  Future<void> _openSubmenu(
-    PickerConfig<dynamic> config, {
-    required Iterable<int> seedIds,
-    required PickerMode mode,
-    OnFinish? onFinish,
-  }) async {
-    // Close current overlay first, then open submenu.
-    _ctrl.closeView('submenu');
-
-    await Future<void>.delayed(Duration.zero);
-
-    if (!mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: SearchAnchorPicker<dynamic>(
-              config: config,
-              initialSelectedIds: seedIds.toList(),
-              mode: mode,
-              onFinish: onFinish,
-              maxHeight: widget.maxHeight,
-              minWidth: widget.minWidth,
-              // In dialog, we use a simple close trigger
-              triggerBuilder: (c, open, v) => Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: open,
-                  icon: const Icon(Icons.open_in_new),
-                  label: Text(config.title ?? 'Open'),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    // Reopen original overlay if you want; usually you don't.
-    // If you do, you can call _ctrl.openView() here.
-  }
-
-  Future<List<T>> _loadItems() => widget.config.loadItems(context);
-
-  bool _matches(T it, String qLower) {
-    if (qLower.isEmpty) return true;
-    for (final s in widget.config.searchTermsOf(it)) {
-      if (s.toLowerCase().contains(qLower)) return true;
-    }
-    return false;
-  }
-
-  void _computeStableOrder(List<T> items) {
+  void _computeStableIds(List<T> items) {
     final selectedFirst = widget.selectedFirst ?? widget.config.selectedFirst;
 
+    final ids = items.map(widget.config.idOf).toList();
+
     if (!selectedFirst) {
-      final copy = [...items];
-      if (widget.config.comparator != null) copy.sort(widget.config.comparator);
-      _stableOrder = copy;
+      if (widget.config.comparator != null) {
+        final sorted = [...items]..sort(widget.config.comparator);
+        _stableIds = sorted.map(widget.config.idOf).toList();
+      } else {
+        _stableIds = ids;
+      }
       return;
     }
-
-    final selectedAtOpen = _openedSnapshot;
 
     final selected = <T>[];
     final others = <T>[];
 
     for (final it in items) {
-      (selectedAtOpen.contains(widget.config.idOf(it)) ? selected : others).add(it);
+      (_openedSnapshot.contains(widget.config.idOf(it)) ? selected : others).add(it);
     }
 
     if (widget.config.comparator != null) {
@@ -262,16 +295,31 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
       others.sort(widget.config.comparator);
     }
 
-    _stableOrder = [...selected, ...others];
+    _stableIds = [...selected.map(widget.config.idOf), ...others.map(widget.config.idOf)];
+  }
+
+  /// Keep existing order for known ids; append new ids; drop removed ids.
+  void _syncStableIds(List<T> items) {
+    final idsNow = items.map(widget.config.idOf).toSet();
+
+    // Drop ids that no longer exist.
+    _stableIds = _stableIds.where(idsNow.contains).toList();
+
+    // Append new ids.
+    final known = _stableIds.toSet();
+    final newItems = items.where((it) => !known.contains(widget.config.idOf(it))).toList();
+
+    if (newItems.isNotEmpty) {
+      if (widget.config.comparator != null) newItems.sort(widget.config.comparator);
+      _stableIds.addAll(newItems.map(widget.config.idOf));
+    }
+
+    // If stableIds is empty (first build), compute from scratch.
+    if (_stableIds.isEmpty) _computeStableIds(items);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Important: if initialSelectedIds changes while popup is open, ignore it.
-    if (!_isOpen) {
-      _pending = widget.initialSelectedIds.toSet();
-    }
-
     final hasSelection = widget.initialSelectedIds.isNotEmpty;
 
     return SearchAnchor(
@@ -281,191 +329,80 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
       suggestionsBuilder: (_, __) => const <Widget>[],
       builder: (context, controller) {
         if (widget.triggerBuilder != null) {
-          return widget.triggerBuilder!(context, _open, _refreshTick);
+          return widget.triggerBuilder!(context, _requestOpen, _tick);
         }
 
         if (widget.triggerChild != null) {
-          return GestureDetector(onTap: _open, child: widget.triggerChild);
+          return GestureDetector(onTap: _requestOpen, child: widget.triggerChild);
         }
 
         return IconButton(
           iconSize: widget.iconSize,
-          icon: hasSelection ? widget.iconWhenSelected : widget.iconWhenEmpty,
           tooltip: widget.config.title,
-          onPressed: _open,
+          icon: hasSelection ? widget.iconWhenSelected : widget.iconWhenEmpty,
+          onPressed: _requestOpen,
         );
       },
       viewBuilder: (suggestions) {
-        return FutureBuilder<List<T>>(
-          future: _loadItems(),
-          builder: (context, snap) {
-            if (!snap.hasData) {
+        return ValueListenableBuilder<int>(
+          valueListenable: _viewTickN,
+          builder: (context, tick, _) {
+            final items = _itemsSnapshot;
+            if (items == null) {
               return const SizedBox(
-                height: 120,
+                height: 140,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               );
             }
 
-            final items = snap.data!;
-            if (_stableOrder.isEmpty) {
-              _computeStableOrder(items);
+            if (_stableIds.isEmpty) {
+              _computeStableIds(items);
+            } else {
+              _syncStableIds(items);
             }
 
-            final q = _ctrl.text.trim().toLowerCase();
-            final base = _stableOrder.isEmpty ? items : _stableOrder;
-            final filtered = base.where((it) => _matches(it, q)).toList();
+            final actions = PickerActions<T>(
+              pendingN: _pendingN,
+              idOf: widget.config.idOf,
+              close: _close,
+              mode: widget.mode,
+              getKey: _getKey,
+            );
 
             final header = widget.headerBuilder != null
-                ? widget.headerBuilder!(context)
+                ? widget.headerBuilder!(context, actions, items)
                 : (widget.headerTiles ?? const <Widget>[]);
 
-            return PickerScope<T>(
-              pending: _pending,
-              setPending: _setPending,
-              toggleId: _toggleId,
-              close: _close,
-              openSubmenu: _openSubmenu,
-              config: widget.config,
-              allItems: items,
+            // Resolve stable order into actual items list.
+            final byId = <int, T>{for (final it in items) widget.config.idOf(it): it};
+            final stableOrder = <T>[
+              for (final id in _stableIds)
+                if (byId.containsKey(id)) byId[id]!,
+            ];
+
+            return OverlayBody<T>(
+              header: header,
+              items: items,
+              stableOrder: stableOrder.isEmpty ? items : stableOrder,
+              ctrl: _ctrl,
+              pendingN: _pendingN,
               mode: widget.mode,
-              child: _PickerOverlayBody<T>(
-                header: header,
-                filtered: filtered,
-                ctrl: _ctrl,
-                pending: _pending,
-                mode: widget.mode,
-                config: widget.config,
-                onToggleGate: widget.onToggle,
-                onLocalToggle: (id, next) async {
-                  _toggleId(id, next);
-                  if (widget.mode == PickerMode.radio) {
-                    _close('radio');
-                  }
-                },
-              ),
+              config: widget.config,
+              onToggleGate: widget.onToggle,
+              close: _close,
             );
           },
         );
       },
-      viewOnClose: () {
-        // SearchAnchor calls this when overlay closes. We handle finish ourselves
-        // via _close() so we do nothing here.
-      },
     );
   }
 }
 
-class _PickerOverlayBody<T> extends StatefulWidget {
-  const _PickerOverlayBody({
-    required this.header,
-    required this.filtered,
-    required this.ctrl,
-    required this.pending,
-    required this.mode,
-    required this.config,
-    required this.onToggleGate,
-    required this.onLocalToggle,
-  });
-
-  final List<Widget> header;
-  final List<T> filtered;
-  final SearchController ctrl;
-  final Set<int> pending;
-  final PickerMode mode;
-  final PickerConfig<T> config;
-
-  final Future<bool> Function(T item, bool nextSelected)? onToggleGate;
-  final Future<void> Function(int id, bool next) onLocalToggle;
-
-  @override
-  State<_PickerOverlayBody<T>> createState() => _PickerOverlayBodyState<T>();
-}
-
-class _PickerOverlayBodyState<T> extends State<_PickerOverlayBody<T>> {
-  final _scroll = ScrollController();
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    super.dispose();
+bool _listEqualsInt(List<int> a, List<int> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final total = widget.header.length + widget.filtered.length;
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          Expanded(
-            child: ScrollConfiguration(
-              behavior: const MaterialScrollBehavior().copyWith(
-                dragDevices: const {
-                  PointerDeviceKind.mouse,
-                  PointerDeviceKind.touch,
-                  PointerDeviceKind.trackpad,
-                },
-              ),
-              child: Scrollbar(
-                controller: _scroll,
-                thumbVisibility: true,
-                interactive: true,
-                child: ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: total,
-                  itemBuilder: (context, index) {
-                    if (index < widget.header.length) {
-                      return widget.header[index];
-                    }
-
-                    final item = widget.filtered[index - widget.header.length];
-                    final id = widget.config.idOf(item);
-                    final checked = widget.pending.contains(id);
-
-                    final icon = widget.config.iconOf?.call(item) ?? const Icon(Icons.circle);
-                    final tooltip = widget.config.tooltipOf?.call(item);
-
-                    Future<void> toggle(bool next) async {
-                      if (widget.onToggleGate != null) {
-                        final ok = await widget.onToggleGate!(item, next);
-                        if (!ok) return;
-                      }
-                      await widget.onLocalToggle(id, next);
-                    }
-
-                    final label = widget.config.labelOf(item);
-                    final customTooltip = widget.config.tooltipOf?.call(item);
-
-                    final labelWidget = (customTooltip == null)
-                        ? OverflowTooltipText(label) // tooltip only if overflow
-                        : Tooltip(
-                            message: customTooltip,
-                            child: Text(label, overflow: TextOverflow.ellipsis),
-                          );
-
-                    return CheckboxListTile(
-                      checkboxShape: widget.mode == PickerMode.radio ? const CircleBorder() : null,
-                      value: checked,
-                      onChanged: (v) => toggle(v ?? false),
-                      title: Row(
-                        children: [
-                          icon,
-                          const SizedBox(width: 6),
-                          Expanded(child: labelWidget),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  return true;
 }

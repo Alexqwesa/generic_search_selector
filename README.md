@@ -1,39 +1,119 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Generic Search Selector
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+A small Flutter library that turns Material 3 `SearchAnchor` into a reusable
+picker widget with selection state, optional nested “sub-pickers”, and a clean
+configuration surface.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
+It is designed for cases where you need:
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+- A searchable list picker (multi or radio selection)
+- “Selected first” ordering and stable ordering
+- Custom header content (actions, nested pickers, filters, etc.)
+- A simple API that hides overlay / lifecycle gotchas
+
+Online demo:
+- Example app (web): <ADD_YOUR_ONLINE_DEMO_LINK_HERE>
+
+Technical deep dive:
+- See `docs/TECHNICAL_OVERVIEW.md` for architecture, lifecycle edge cases,
+  and why some fixes exist (Keys, PostFrameCallback, etc.).
+
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- `SearchAnchorPicker<T>`: drop-in picker built on Flutter Material 3
+- Two selection modes:
+  - `PickerMode.multi` (checkbox style)
+  - `PickerMode.radio` (single select)
+- Fully generic item type `T` via `PickerConfig<T>`
+- Header builder with `PickerActions` for advanced scenarios:
+  - Clear selection
+  - Sync selection with external state
+  - Nested sub-pickers (optional)
+- Works with any state management approach:
+  - `setState`
+  - `ValueNotifier`
+  - Riverpod, Provider, BLoC, etc.
 
-## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+## Installation
 
-## Usage
+Add the package to your `pubspec.yaml`:
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
-```dart
-const like = 'sample';
+```yaml
+dependencies:
+  generic_search_selector:  # soon
+  
+dependencies:
+  generic_search_selector:
+    git:
+      url: <REPO_URL_HERE>
+      ref: <TAG_OR_COMMIT_HERE>
 ```
 
-## Additional information
+## Quick example
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+Minimal multi-select with local state.
+(Works the same with Riverpod/Bloc/etc — just update your state in onToggle.)
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:generic_search_selector/picker_config.dart';
+import 'package:generic_search_selector/search_anchor_picker.dart';
+
+class Person {
+  Person(this.id, this.name);
+  final int id;
+  final String name;
+}
+
+class PeoplePickerDemo extends StatefulWidget {
+  const PeoplePickerDemo({super.key});
+
+  @override
+  State<PeoplePickerDemo> createState() => _PeoplePickerDemoState();
+}
+
+class _PeoplePickerDemoState extends State<PeoplePickerDemo> {
+  final _items = <Person>[
+    Person(1, 'Alice'),
+    Person(2, 'Bob'),
+    Person(3, 'Charlie'),
+  ];
+
+  final _selectedIds = <int>{};
+
+  late final PickerConfig<Person> _config = PickerConfig<Person>(
+    title: 'Pick people',
+    loadItems: (_) async => _items,
+    idOf: (p) => p.id,
+    labelOf: (p) => p.name,
+    searchTermsOf: (p) => [p.name, p.id.toString()],
+    selectedFirst: true,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return SearchAnchorPicker<Person>(
+      config: _config,
+      mode: PickerMode.multi,
+      initialSelectedIds: _selectedIds.toList()..sort(),
+      onToggle: (item, next) async {
+        setState(() {
+          next ? _selectedIds.add(item.id) : _selectedIds.remove(item.id);
+        });
+        return true;
+      },
+      triggerBuilder: (_, open, __) => IconButton(
+        tooltip: 'Open picker',
+        onPressed: open,
+        icon: const Icon(Icons.person_search),
+      ),
+      maxHeight: 420,
+      minWidth: 320,
+    );
+  }
+}
+```
+
+## MIT License

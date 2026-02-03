@@ -4,18 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:generic_search_selector/picker_config.dart';
 import 'package:generic_search_selector/search_anchor_picker.dart';
 
-
 void main() {
   runApp(const DemoApp());
 }
 
 /// Simple item model.
 class DemoItem {
-  const DemoItem({
-    required this.id,
-    required this.label,
-    required this.group,
-  });
+  const DemoItem({required this.id, required this.label, required this.group});
 
   final int id;
   final String label;
@@ -85,6 +80,7 @@ class _DemoHomeState extends State<DemoHome> {
   late final ItemsRepo<DemoItem> listB = ItemsRepo<DemoItem>(_initialListB());
   late final ItemsRepo<DemoItem> subB1 = ItemsRepo<DemoItem>(_initialSubB1());
   late final ItemsRepo<DemoItem> subB2 = ItemsRepo<DemoItem>(_initialSubB2());
+
   int? selectedRadioId;
 
   // Screen selections (not counted as “providers”).
@@ -100,10 +96,34 @@ class _DemoHomeState extends State<DemoHome> {
     return null;
   }
 
-  PickerConfig<DemoItem> configForRepo(ItemsRepo<DemoItem> repo, {String? title}) {
+  /// Build a global resolver map for chips (so chips show names, not just ids).
+  Map<int, DemoItem> buildUniverse() {
+    final all = <DemoItem>[
+      ...listA.items,
+      ...subA1.items,
+      ...subA2.items,
+      ...listB.items,
+      ...subB1.items,
+      ...subB2.items,
+    ];
+
+    final m = <int, DemoItem>{};
+    for (final it in all) {
+      m[it.id] = it;
+    }
+    return m;
+  }
+
+  PickerConfig<DemoItem> configForRepo(
+    ItemsRepo<DemoItem> repo, {
+    String? title,
+    UnselectBehavior unselectBehavior = UnselectBehavior.allow,
+    bool Function(DemoItem)? isItemInUse,
+  }) {
     return PickerConfig<DemoItem>(
       title: title,
       loadItems: (_) => repo.load(),
+      listenable: repo,
       idOf: (it) => it.id,
       labelOf: (it) => it.label,
       searchTermsOf: (it) => [it.label, it.group, it.id.toString()],
@@ -113,10 +133,30 @@ class _DemoHomeState extends State<DemoHome> {
       ),
       comparator: (a, b) => a.label.compareTo(b.label),
       selectedFirst: true,
+      unselectBehavior: unselectBehavior,
+      isItemInUse: isItemInUse,
     );
   }
 
   List<int> _ids(Set<int> s) => s.toList()..sort();
+
+  List<int> _intersectionIds(
+    Iterable<DemoItem> current,
+    Iterable<DemoItem> allowed,
+  ) {
+    final allowedIds = allowed.map((e) => e.id).toSet();
+    final out = <int>[];
+    for (final it in current) {
+      if (allowedIds.contains(it.id)) out.add(it.id);
+    }
+    out.sort();
+    return out;
+  }
+
+  void _removeDanglingSelectionsA() {
+    final valid = listA.items.map((e) => e.id).toSet();
+    selectedOnScreenA.removeWhere((id) => !valid.contains(id));
+  }
 
   @override
   void dispose() {
@@ -131,8 +171,18 @@ class _DemoHomeState extends State<DemoHome> {
 
   @override
   Widget build(BuildContext context) {
+    final universe = buildUniverse();
+
     final mainAConfig = configForRepo(listA, title: 'Icon #1 main list');
-    final subA1Config = configForRepo(subA1, title: 'Sub A1');
+    final subA1Config = configForRepo(
+      subA1,
+      title: 'Sub A1',
+      unselectBehavior: UnselectBehavior.alert,
+      isItemInUse: (item) {
+        // Warn if trying to remove an item that is currently selected in MAIN list A.
+        return selectedOnScreenA.contains(item.id);
+      },
+    );
     final subA2Config = configForRepo(subA2, title: 'Sub A2');
 
     final mainBConfig = configForRepo(listB, title: 'Icon #2 main list');
@@ -151,7 +201,6 @@ class _DemoHomeState extends State<DemoHome> {
               '- Selecting items in main list A toggles chips on screen',
             ),
             const SizedBox(height: 8),
-
             Row(
               children: [
                 _CircleIconTrigger(
@@ -163,52 +212,81 @@ class _DemoHomeState extends State<DemoHome> {
                     // Selecting in MAIN list => affects screen selection
                     onToggle: (item, next) async {
                       setState(() {
-                        next ? selectedOnScreenA.add(item.id) : selectedOnScreenA.remove(item.id);
+                        next
+                            ? selectedOnScreenA.add(item.id)
+                            : selectedOnScreenA.remove(item.id);
                       });
                       return true;
                     },
 
                     // Header has two sub pickers that modify listA contents
-                    headerBuilder: (ctx) {
+                    headerBuilder: (ctx, actions, allItems) {
                       return [
                         _SubPickerTile(
+                          key: actions.getKey('subA1'),
                           title: 'Add/remove from Sub A1',
                           icon: Icons.playlist_add,
                           config: subA1Config,
-                          seedIds: listA.items.map((e) => e.id).toList(),
+
+                          // Seed ONLY items that came from this sub list.
+                          seedIds: _intersectionIds(listA.items, subA1.items),
+
                           onFinish: (ids, {required added, required removed}) async {
                             final addItems = added
                                 .map((id) => findById(subA1.items, id))
                                 .whereType<DemoItem>()
                                 .toList();
 
-                            listA.addAll(addItems, same);
-                            listA.removeWhere((x) => removed.contains(x.id));
+                            setState(() {
+                              listA.addAll(addItems, same);
+                              listA.removeWhere((x) => removed.contains(x.id));
+
+                              // Keep screen chips consistent if an item disappears from listA.
+                              _removeDanglingSelectionsA();
+                            });
+
+                            // If main picker overlay is open, also clear pending for removed ids.
+                            final nextPending = {...actions.pending}
+                              ..removeAll(removed);
+                            actions.setPending(nextPending);
                           },
                         ),
                         _SubPickerTile(
+                          key: actions.getKey('subA2'),
                           title: 'Add/remove from Sub A2',
                           icon: Icons.playlist_add_check,
                           config: subA2Config,
-                          seedIds: listA.items.map((e) => e.id).toList(),
-                          onFinish: (ids, {required added, required removed}) async {
-                            final addItems = added
-                                .map((id) => findById(subA2.items, id))
-                                .whereType<DemoItem>()
-                                .toList();
+                          seedIds: _intersectionIds(listA.items, subA2.items),
+                          onFinish:
+                              (ids, {required added, required removed}) async {
+                                final addItems = added
+                                    .map((id) => findById(subA2.items, id))
+                                    .whereType<DemoItem>()
+                                    .toList();
 
-                            listA.addAll(addItems, same);
-                            listA.removeWhere((x) => removed.contains(x.id));
-                          },
+                                setState(() {
+                                  listA.addAll(addItems, same);
+                                  listA.removeWhere(
+                                    (x) => removed.contains(x.id),
+                                  );
+                                  _removeDanglingSelectionsA();
+                                });
+
+                                final nextPending = {...actions.pending}
+                                  ..removeAll(removed);
+                                actions.setPending(nextPending);
+                              },
                         ),
                         const Divider(height: 1),
                         ListTile(
                           leading: const Icon(Icons.clear_all),
                           title: const Text('Clear screen selection A'),
                           onTap: () {
-                            final scope = PickerScope.of<DemoItem>(ctx);
+                            // 1) clear screen state
                             setState(() => selectedOnScreenA.clear());
-                            scope.setPending(<int>{}); // UI inside overlay
+
+                            // 2) clear overlay pending selection NOW (immediate checkbox repaint)
+                            actions.selectNone();
                           },
                         ),
                         const Divider(height: 1),
@@ -223,22 +301,26 @@ class _DemoHomeState extends State<DemoHome> {
                         iconSize: 40,
                         onPressed: open,
                         icon: Icon(
-                          has ? Icons.person_search : Icons.person_search_outlined,
+                          has
+                              ? Icons.person_search
+                              : Icons.person_search_outlined,
                           color: has ? Colors.green : null,
                         ),
                       );
                     },
 
-                    // When overlay closes, rebuild to reflect latest listA changes, etc.
-                    onFinish: (finalIds, {required added, required removed}) async {
-                      // no-op in demo
-                    },
                     maxHeight: MediaQuery.sizeOf(context).height * 2 / 3,
                     minWidth: 520,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: _SelectedChips(title: 'Selected on screen A', ids: selectedOnScreenA)),
+                Expanded(
+                  child: _SelectedChips(
+                    title: 'Selected on screen A',
+                    ids: selectedOnScreenA,
+                    universe: universe,
+                  ),
+                ),
               ],
             ),
 
@@ -264,47 +346,63 @@ class _DemoHomeState extends State<DemoHome> {
                     // Selecting in MAIN list => affects screen selection
                     onToggle: (item, next) async {
                       setState(() {
-                        next ? selectedOnScreenB.add(item.id) : selectedOnScreenB.remove(item.id);
+                        next
+                            ? selectedOnScreenB.add(item.id)
+                            : selectedOnScreenB.remove(item.id);
                       });
                       return true;
                     },
 
-                    headerBuilder: (ctx) {
+                    headerBuilder: (ctx, actions, allItems) {
                       return [
                         _SubPickerTile(
+                          key: actions.getKey('subB1'),
                           title: 'Select from Sub B1 (to screen)',
                           icon: Icons.person_add_alt_1,
                           config: subB1Config,
                           seedIds: _ids(selectedOnScreenB),
-                          onFinish: (ids, {required added, required removed}) async {
-                            setState(() {
-                              selectedOnScreenB
-                                ..addAll(added)
-                                ..removeAll(removed);
-                            });
-                          },
+                          onFinish:
+                              (ids, {required added, required removed}) async {
+                                setState(() {
+                                  selectedOnScreenB
+                                    ..addAll(added)
+                                    ..removeAll(removed);
+                                });
+
+                                // Also update main overlay checkboxes immediately.
+                                final nextPending = {...actions.pending}
+                                  ..addAll(added)
+                                  ..removeAll(removed);
+                                actions.setPending(nextPending);
+                              },
                         ),
                         _SubPickerTile(
+                          key: actions.getKey('subB2'),
                           title: 'Select from Sub B2 (to screen)',
                           icon: Icons.person_add_alt,
                           config: subB2Config,
                           seedIds: _ids(selectedOnScreenB),
-                          onFinish: (ids, {required added, required removed}) async {
-                            setState(() {
-                              selectedOnScreenB
-                                ..addAll(added)
-                                ..removeAll(removed);
-                            });
-                          },
+                          onFinish:
+                              (ids, {required added, required removed}) async {
+                                setState(() {
+                                  selectedOnScreenB
+                                    ..addAll(added)
+                                    ..removeAll(removed);
+                                });
+
+                                final nextPending = {...actions.pending}
+                                  ..addAll(added)
+                                  ..removeAll(removed);
+                                actions.setPending(nextPending);
+                              },
                         ),
                         const Divider(height: 1),
                         ListTile(
                           leading: const Icon(Icons.clear_all),
                           title: const Text('Clear screen selection B'),
                           onTap: () {
-                            final scope = PickerScope.of<DemoItem>(ctx);
                             setState(() => selectedOnScreenB.clear());
-                            scope.setPending(<int>{});
+                            actions.selectNone();
                           },
                         ),
                         const Divider(height: 1),
@@ -329,98 +427,105 @@ class _DemoHomeState extends State<DemoHome> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: _SelectedChips(title: 'Selected on screen B', ids: selectedOnScreenB)),
+                Expanded(
+                  child: _SelectedChips(
+                    title: 'Selected on screen B',
+                    ids: selectedOnScreenB,
+                    universe: universe,
+                  ),
+                ),
               ],
             ),
 
-
             const SizedBox(height: 28),
-const Divider(),
-const SizedBox(height: 28),
+            const Divider(),
+            const SizedBox(height: 28),
 
-const Text(
-  'Icon #3 (radio mode):\n'
-  '- Single select\n'
-  '- Click selects one item and closes the popup immediately',
-),
-const SizedBox(height: 8),
-
-Row(
-  children: [
-    _CircleIconTrigger(
-      child: SearchAnchorPicker<DemoItem>(
-        config: configForRepo(
-          listA,
-          title: 'Radio picker demo',
-        ),
-        mode: PickerMode.radio,
-
-        // Seed selection for radio (0 or 1 item).
-        initialSelectedIds: selectedRadioId == null ? const [] : [selectedRadioId!],
-
-        // In radio mode, toggling "true" is the selection action.
-        // (The picker itself will close automatically after it sets pending.)
-        onToggle: (item, next) async {
-          if (!next) return false; // ignore deselect in radio mode
-          setState(() => selectedRadioId = item.id);
-          return true;
-        },
-
-        triggerBuilder: (_, open, version) {
-          final has = selectedRadioId != null;
-          return IconButton(
-            tooltip: 'Open radio picker',
-            iconSize: 40,
-            onPressed: open,
-            icon: Icon(
-              has ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: has ? Colors.green : null,
+            const Text(
+              'Icon #3 (radio mode):\n'
+              '- Single select\n'
+              '- Click selects one item and closes the popup immediately',
             ),
-          );
-        },
+            const SizedBox(height: 8),
 
-        // Optional: onFinish fires after close (diff vs open snapshot).
-        onFinish: (finalIds, {required added, required removed}) async {
-          // In radio, finalIds is either [] or [id].
-          // We already set selectedRadioId in onToggle, so this can be a no-op.
-        },
+            Row(
+              children: [
+                _CircleIconTrigger(
+                  child: SearchAnchorPicker<DemoItem>(
+                    config: configForRepo(listA, title: 'Radio picker demo'),
+                    mode: PickerMode.radio,
 
-        maxHeight: MediaQuery.sizeOf(context).height * 2 / 3,
-        minWidth: 520,
-      ),
-    ),
-    const SizedBox(width: 12),
-    Expanded(
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Selected radio item', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              if (selectedRadioId == null)
-                const Text('No selection')
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Chip(label: Text('#$selectedRadioId')),
-                    TextButton(
-                      onPressed: () => setState(() => selectedRadioId = null),
-                      child: const Text('Clear'),
-                    ),
-                  ],
+                    // Seed selection for radio (0 or 1 item).
+                    initialSelectedIds: selectedRadioId == null
+                        ? const []
+                        : [selectedRadioId!],
+
+                    // In radio mode, toggling "true" is the selection action.
+                    onToggle: (item, next) async {
+                      if (!next) return false; // ignore deselect
+                      setState(() => selectedRadioId = item.id);
+                      return true;
+                    },
+
+                    triggerBuilder: (_, open, version) {
+                      final has = selectedRadioId != null;
+                      return IconButton(
+                        tooltip: 'Open radio picker',
+                        iconSize: 40,
+                        onPressed: open,
+                        icon: Icon(
+                          has
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: has ? Colors.green : null,
+                        ),
+                      );
+                    },
+
+                    maxHeight: MediaQuery.sizeOf(context).height * 2 / 3,
+                    minWidth: 520,
+                  ),
                 ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  ],
-),
-
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Selected radio item',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          if (selectedRadioId == null)
+                            const Text('No selection')
+                          else
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                Chip(
+                                  label: Text(
+                                    universe[selectedRadioId!]?.label ??
+                                        '#$selectedRadioId',
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      setState(() => selectedRadioId = null),
+                                  child: const Text('Clear'),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -430,35 +535,39 @@ Row(
   // ===== demo data =====
 
   List<DemoItem> _initialListA() => const [
-        DemoItem(id: 1, label: 'A: Alice (internal)', group: 'internal'),
-        DemoItem(id: 2, label: 'A: Bob (internal)', group: 'internal'),
-      ];
+    DemoItem(id: 1, label: 'A: Alice (internal)', group: 'internal'),
+    DemoItem(id: 2, label: 'A: Bob (internal)', group: 'internal'),
+  ];
 
   List<DemoItem> _initialSubA1() => const [
-        DemoItem(id: 10, label: 'A1: Charlie (external)', group: 'external'),
-        DemoItem(id: 11, label: 'A1: Diana (external)', group: 'external'),
-        DemoItem(id: 12, label: 'A1: This label is very very long to force ellipsis tooltip', group: 'external'),
-      ];
+    DemoItem(id: 10, label: 'A1: Charlie (external)', group: 'external'),
+    DemoItem(id: 11, label: 'A1: Diana (external)', group: 'external'),
+    DemoItem(
+      id: 12,
+      label: 'A1: This label is very very long to force ellipsis tooltip',
+      group: 'external',
+    ),
+  ];
 
   List<DemoItem> _initialSubA2() => const [
-        DemoItem(id: 20, label: 'A2: Ethan (internal)', group: 'internal'),
-        DemoItem(id: 21, label: 'A2: Fiona (internal)', group: 'internal'),
-      ];
+    DemoItem(id: 20, label: 'A2: Ethan (internal)', group: 'internal'),
+    DemoItem(id: 21, label: 'A2: Fiona (internal)', group: 'internal'),
+  ];
 
   List<DemoItem> _initialListB() => const [
-        DemoItem(id: 101, label: 'B: Igor (internal)', group: 'internal'),
-        DemoItem(id: 102, label: 'B: Julia (internal)', group: 'internal'),
-      ];
+    DemoItem(id: 101, label: 'B: Igor (internal)', group: 'internal'),
+    DemoItem(id: 102, label: 'B: Julia (internal)', group: 'internal'),
+  ];
 
   List<DemoItem> _initialSubB1() => const [
-        DemoItem(id: 110, label: 'B1: Ken (external)', group: 'external'),
-        DemoItem(id: 111, label: 'B1: Lina (external)', group: 'external'),
-      ];
+    DemoItem(id: 110, label: 'B1: Ken (external)', group: 'external'),
+    DemoItem(id: 111, label: 'B1: Lina (external)', group: 'external'),
+  ];
 
   List<DemoItem> _initialSubB2() => const [
-        DemoItem(id: 120, label: 'B2: Max (internal)', group: 'internal'),
-        DemoItem(id: 121, label: 'B2: Nina (internal)', group: 'internal'),
-      ];
+    DemoItem(id: 120, label: 'B2: Max (internal)', group: 'internal'),
+    DemoItem(id: 121, label: 'B2: Nina (internal)', group: 'internal'),
+  ];
 }
 
 class _CircleIconTrigger extends StatelessWidget {
@@ -483,6 +592,7 @@ class _CircleIconTrigger extends StatelessWidget {
 /// Sub-picker shown as a header tile that opens its own overlay.
 class _SubPickerTile extends StatelessWidget {
   const _SubPickerTile({
+    super.key,
     required this.title,
     required this.icon,
     required this.config,
@@ -505,10 +615,7 @@ class _SubPickerTile extends StatelessWidget {
       config: config,
       initialSelectedIds: seedIds,
       mode: PickerMode.multi,
-      triggerChild: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-      ),
+      triggerChild: ListTile(leading: Icon(icon), title: Text(title)),
       onFinish: onFinish,
       maxHeight: MediaQuery.sizeOf(context).height * 2 / 3,
       minWidth: 520,
@@ -520,10 +627,12 @@ class _SelectedChips extends StatelessWidget {
   const _SelectedChips({
     required this.title,
     required this.ids,
+    required this.universe,
   });
 
   final String title;
   final Set<int> ids;
+  final Map<int, DemoItem> universe;
 
   @override
   Widget build(BuildContext context) {
@@ -545,9 +654,7 @@ class _SelectedChips extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   for (final id in list)
-                    Chip(
-                      label: Text('#$id'),
-                    ),
+                    Chip(label: Text(universe[id]?.label ?? '#$id')),
                 ],
               ),
           ],

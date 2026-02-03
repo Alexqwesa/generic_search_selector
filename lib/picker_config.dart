@@ -24,6 +24,9 @@ class PickerConfig<T> {
     this.comparator,
     this.title,
     this.selectedFirst = true,
+    this.listenable,
+    this.unselectBehavior = UnselectBehavior.allow,
+    this.isItemInUse,
   });
 
   /// Loads the full list of selectable items.
@@ -85,6 +88,17 @@ class PickerConfig<T> {
   ///
   /// This order is computed once per open (stable while the overlay is open).
   final bool selectedFirst;
+
+  /// If provided, the overlay will rebuild when this notifies.
+  /// Use this when your items source is a ChangeNotifier / ValueNotifier / etc.
+  final Listenable? listenable;
+
+  /// Strategy to handle deselection of items that might be "in use".
+  final UnselectBehavior unselectBehavior;
+
+  /// Predicate to check if an item is currently "in use" externally.
+  /// If true, [unselectBehavior] will be triggered on deselection.
+  final bool Function(T)? isItemInUse;
 }
 
 typedef OnFinish =
@@ -95,3 +109,11 @@ typedef OnFinish =
     });
 
 enum PickerMode { multi, radio }
+
+enum UnselectBehavior {
+  block,
+  showWarning,
+  alert,
+  allow,
+  // keepSelected,
+}
