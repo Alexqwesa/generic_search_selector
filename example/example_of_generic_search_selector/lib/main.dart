@@ -1,8 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:generic_search_selector/picker_config.dart';
-import 'package:generic_search_selector/search_anchor_picker.dart';
+import 'package:generic_search_selector/generic_search_selector.dart';
 
 void main() {
   runApp(const DemoApp());

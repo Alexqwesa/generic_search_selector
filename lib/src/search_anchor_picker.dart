@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:generic_search_selector/overlay_body.dart';
-import 'package:generic_search_selector/picker_config.dart';
+import 'package:generic_search_selector/src/overlay_body.dart';
+import 'package:generic_search_selector/src/picker_config.dart';
 /// Generic SearchAnchor-based picker with stable in-overlay selection.
 ///
 /// Key properties:

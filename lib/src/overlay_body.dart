@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:generic_search_selector/overflow_tooltip_text.dart';
-import 'package:generic_search_selector/picker_config.dart';
+import 'package:generic_search_selector/src/overflow_tooltip_text.dart';
+import 'package:generic_search_selector/src/picker_config.dart';
 
 class OverlayBody<T> extends StatefulWidget {
   const OverlayBody({
