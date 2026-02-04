@@ -3,44 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/overlay_body.dart';
 import 'package:generic_search_selector/picker_config.dart';
-
-/// Actions exposed to headerBuilder so callers never need InheritedWidget lookups.
-///
-/// This is intentionally thin:
-/// - It operates on the in-overlay pending selection only.
-/// - It never calls setState; it only updates [pendingN] and closes the picker.
-class PickerActions<T> {
-  PickerActions({
-    required this.pendingN,
-    required this.idOf,
-    required this.close,
-    required this.mode,
-    required this.getKey,
-  });
-
-  final ValueNotifier<Set<int>> pendingN;
-  final int Function(T) idOf;
-  final void Function([String? reason]) close;
-  final GlobalKey Function(Object id) getKey;
-  final PickerMode mode;
-
-  Set<int> get pending => pendingN.value;
-
-  void setPending(Set<int> ids) => pendingN.value = ids;
-
-  void selectAll(Iterable<int> ids) => setPending(ids.toSet());
-
-  void selectNone() => setPending(<int>{});
-
-  void toggleId(int id, bool next) {
-    final s = {...pending};
-    next ? s.add(id) : s.remove(id);
-    setPending(s);
-  }
-}
-
-enum CloseQueryBehavior { keep, clear }
-
 /// Generic SearchAnchor-based picker with stable in-overlay selection.
 ///
 /// Key properties:

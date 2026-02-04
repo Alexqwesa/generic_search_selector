@@ -47,8 +47,8 @@ dependencies:
 dependencies:
   generic_search_selector:
     git:
-      url: <REPO_URL_HERE>
-      ref: <TAG_OR_COMMIT_HERE>
+      url: https://github.com/Alexqwesa/generic_search_selector.git
+      ref: main
 ```
 
 ## Quick example
@@ -115,5 +115,10 @@ class _PeoplePickerDemoState extends State<PeoplePickerDemo> {
   }
 }
 ```
+
+## TODO: 
+headerBuilder: (context, actions) => allUnitsHeader(context, actions, allJsas, ref),
+footerBuilder: 
+customActions?
 
 ## MIT License
