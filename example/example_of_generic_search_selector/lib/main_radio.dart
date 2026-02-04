@@ -118,6 +118,19 @@ class _RadioHomeState extends State<RadioHome> {
                   searchTermsOf: (it) => [it.label],
                 ),
                 mode: PickerMode.radio, // Sub picker is also radio
+                itemBuilder: (context, item, isSelected, onToggle) {
+                  return CheckboxListTile(
+                    value: isSelected,
+                    onChanged: (v) => onToggle(v),
+                    title: Text(
+                      item.label,
+                      style: const TextStyle(
+                        color: Colors.red,
+                      ), // Custom styling
+                    ),
+                    subtitle: const Text('Custom Builder'),
+                  );
+                },
                 triggerChild: const ListTile(
                   title: Text('Sub Radio Trigger (Tile)'),
                 ),

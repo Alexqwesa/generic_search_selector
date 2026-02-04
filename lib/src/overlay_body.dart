@@ -15,6 +15,7 @@ class OverlayBody<T> extends StatefulWidget {
     required this.config,
     required this.onToggleGate,
     required this.close,
+    this.itemBuilder,
   });
 
   final List<Widget> header;
@@ -29,6 +30,13 @@ class OverlayBody<T> extends StatefulWidget {
 
   final Future<bool> Function(T item, bool nextSelected)? onToggleGate;
   final void Function([String? reason, bool skipCloseView]) close;
+  final Widget Function(
+    BuildContext context,
+    T item,
+    bool isSelected,
+    ValueChanged<bool?> onToggle,
+  )?
+  itemBuilder;
 
   @override
   State<OverlayBody<T>> createState() => _OverlayBodyState<T>();
@@ -186,6 +194,15 @@ class _OverlayBodyState<T> extends State<OverlayBody<T>> {
                               final s = {...current};
                               next ? s.add(id) : s.remove(id);
                               widget.pendingN.value = s;
+                            }
+
+                            if (widget.itemBuilder != null) {
+                              return widget.itemBuilder!(
+                                context,
+                                item,
+                                checked,
+                                (v) => toggle(v ?? false),
+                              );
                             }
 
                             return CheckboxListTile(
