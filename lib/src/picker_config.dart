@@ -14,7 +14,7 @@ typedef LoadItems<T> = Future<List<T>> Function(BuildContext context);
 /// changes to [initialSelectedIds] from outside will not clobber the user’s
 /// pending selection until the overlay is closed.
 class PickerConfig<T> {
-  const PickerConfig({
+  PickerConfig({
     required this.loadItems,
     required this.idOf,
     required this.labelOf,
@@ -28,6 +28,32 @@ class PickerConfig<T> {
     this.unselectBehavior = UnselectBehavior.allow,
     this.isItemInUse,
   });
+
+  /// internal callback to open the picker. (Set by SearchAnchorPicker).
+  /// Do not set this manually.
+  VoidCallback? internalOnOpen;
+
+  /// Internal callback to close the picker. (Set by SearchAnchorPicker).
+  /// Do not set this manually.
+  void Function([String? reason])? internalOnClose;
+
+  /// Programmatically open the picker.
+  ///
+  /// Requires the [PickerConfig] to be currently attached to a [SearchAnchorPicker] (or [SubPickerTile]).
+  void open() {
+    if (internalOnOpen != null) {
+      internalOnOpen!();
+    }
+  }
+
+  /// Programmatically close the picker.
+  ///
+  /// Requires the [PickerConfig] to be currently attached to a [SearchAnchorPicker] (or [SubPickerTile]).
+  void close([String? reason]) {
+    if (internalOnClose != null) {
+      internalOnClose!(reason);
+    }
+  }
 
   /// Loads the full list of selectable items.
   ///

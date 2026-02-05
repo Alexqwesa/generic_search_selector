@@ -52,8 +52,7 @@ class SearchAnchorPicker<T> extends StatefulWidget {
   final SearchController? searchController;
 
   /// Optional trigger builder (gets open callback + version tick).
-  final Widget Function(BuildContext context, VoidCallback open, int version)?
-  triggerBuilder;
+  final Widget Function(BuildContext context, VoidCallback open, int version)? triggerBuilder;
 
   final Widget? triggerChild;
 
@@ -65,11 +64,7 @@ class SearchAnchorPicker<T> extends StatefulWidget {
   final double minWidth;
 
   /// Preferred: build header widgets with [PickerActions].
-  final List<Widget> Function(
-    BuildContext context,
-    PickerActions<T> actions,
-    List<T> allItems,
-  )?
+  final List<Widget> Function(BuildContext context, PickerActions<T> actions, List<T> allItems)?
   headerBuilder;
 
   /// Legacy static header tiles (used if headerBuilder is null).
@@ -118,6 +113,21 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
   void initState() {
     super.initState();
     _attachListenable(widget.config.listenable);
+    _bindConfigControl();
+  }
+
+  void _bindConfigControl() {
+    widget.config.internalOnOpen = _requestOpen;
+    // Usage of closure protects against tearing off methods if signatures vary slightly,
+    // and allows cleaner unbinding.
+    widget.config.internalOnClose = ([reason]) => _close(reason);
+  }
+
+  void _unbindConfigControl(PickerConfig<T> config) {
+    if (config.internalOnOpen == _requestOpen) config.internalOnOpen = null;
+    // We can't identify the closure wrapper easily so we blindly clear it
+    // assuming we are the owner.
+    config.internalOnClose = null;
   }
 
   List<T>? _itemsSnapshot;
@@ -145,17 +155,18 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
   void didUpdateWidget(covariant SearchAnchorPicker<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    if (oldWidget.config != widget.config) {
+      _unbindConfigControl(oldWidget.config);
+      _bindConfigControl();
+    }
+
     if (oldWidget.config.listenable != widget.config.listenable) {
       _detachListenable(oldWidget.config.listenable);
       _attachListenable(widget.config.listenable);
     }
 
     // Sync from external seed ONLY when overlay is not open.
-    if (!_open &&
-        !_listEqualsInt(
-          oldWidget.initialSelectedIds,
-          widget.initialSelectedIds,
-        )) {
+    if (!_open && !_listEqualsInt(oldWidget.initialSelectedIds, widget.initialSelectedIds)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _pendingN.value = widget.initialSelectedIds.toSet();
       });
@@ -164,6 +175,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
 
   @override
   void dispose() {
+    _unbindConfigControl(widget.config);
     _detachListenable(widget.config.listenable);
     _pendingN.dispose();
     // if (!_open) _viewTickN.dispose();
@@ -208,7 +220,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
     _ctrl.openView();
   }
 
-  void _close([String? _reasonIgnored, bool skipCloseView = false]) {
+  void _close([String? reasonIgnored, bool skipCloseView = false]) {
     final queryAtClose = _ctrl.text;
 
     // IMPORTANT: do not pass reason -> it can affect controller text next open.
@@ -235,6 +247,8 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
+      // Guard against multiple calls to _close triggering multiple onFinish callbacks
+      if (!_open) return;
       _open = false;
 
       // Clear header keys on close to release them
@@ -269,8 +283,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
     final others = <T>[];
 
     for (final it in items) {
-      (_openedSnapshot.contains(widget.config.idOf(it)) ? selected : others)
-          .add(it);
+      (_openedSnapshot.contains(widget.config.idOf(it)) ? selected : others).add(it);
     }
 
     if (widget.config.comparator != null) {
@@ -278,10 +291,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
       others.sort(widget.config.comparator);
     }
 
-    _stableIds = [
-      ...selected.map(widget.config.idOf),
-      ...others.map(widget.config.idOf),
-    ];
+    _stableIds = [...selected.map(widget.config.idOf), ...others.map(widget.config.idOf)];
   }
 
   /// Keep existing order for known ids; append new ids; drop removed ids.
@@ -293,13 +303,10 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
 
     // Append new ids.
     final known = _stableIds.toSet();
-    final newItems = items
-        .where((it) => !known.contains(widget.config.idOf(it)))
-        .toList();
+    final newItems = items.where((it) => !known.contains(widget.config.idOf(it))).toList();
 
     if (newItems.isNotEmpty) {
-      if (widget.config.comparator != null)
-        newItems.sort(widget.config.comparator);
+      if (widget.config.comparator != null) newItems.sort(widget.config.comparator);
       _stableIds.addAll(newItems.map(widget.config.idOf));
     }
 
@@ -314,10 +321,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
     return SearchAnchor(
       searchController: _ctrl,
       isFullScreen: false,
-      viewConstraints: BoxConstraints(
-        maxHeight: widget.maxHeight,
-        minWidth: widget.minWidth,
-      ),
+      viewConstraints: BoxConstraints(maxHeight: widget.maxHeight, minWidth: widget.minWidth),
       suggestionsBuilder: (_, __) => const <Widget>[],
       builder: (context, controller) {
         if (widget.triggerBuilder != null) {
@@ -325,10 +329,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
         }
 
         if (widget.triggerChild != null) {
-          return GestureDetector(
-            onTap: _requestOpen,
-            child: widget.triggerChild,
-          );
+          return GestureDetector(onTap: _requestOpen, child: widget.triggerChild);
         }
 
         return IconButton(
@@ -370,9 +371,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
                 : (widget.headerTiles ?? const <Widget>[]);
 
             // Resolve stable order into actual items list.
-            final byId = <int, T>{
-              for (final it in items) widget.config.idOf(it): it,
-            };
+            final byId = <int, T>{for (final it in items) widget.config.idOf(it): it};
             final stableOrder = <T>[
               for (final id in _stableIds)
                 if (byId.containsKey(id)) byId[id]!,

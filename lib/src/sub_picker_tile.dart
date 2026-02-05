@@ -21,10 +21,10 @@ class SubPickerTile<T> extends StatelessWidget {
     this.trailing,
     this.triggerBuilder,
     this.itemBuilder,
-  });
+  }) : assert(title != null || triggerBuilder != null);
 
   /// Title shown on the tile.
-  final String title;
+  final String? title;
 
   /// Configuration for the sub-picker.
   final PickerConfig<T> config;
@@ -77,7 +77,7 @@ class SubPickerTile<T> extends StatelessWidget {
       triggerChild: triggerBuilder == null
           ? ListTile(
               leading: leading ?? (icon != null ? Icon(icon) : null),
-              title: Text(title),
+              title: Text(title!),
               subtitle: subtitle,
               trailing: trailing,
               dense: true,
