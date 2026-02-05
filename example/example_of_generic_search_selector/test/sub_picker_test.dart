@@ -94,4 +94,72 @@ void main() {
       true,
     ); // 3 was not involved in sub-picker
   });
+
+  testWidgets('SubPickerTile uses triggerBuilder', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubPickerTile<int>(
+            title: 'I am ignored',
+            config: PickerConfig(
+              loadItems: (_) async => [1],
+              idOf: (i) => i,
+              labelOf: (i) => '$i',
+              searchTermsOf: (_) => [],
+            ),
+            initialSelectedIds: const [],
+            triggerBuilder: (context, open, tick) {
+              return ElevatedButton(
+                onPressed: open,
+                child: Text('Custom Trigger $tick'),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('I am ignored'), findsNothing);
+    expect(find.text('Custom Trigger 0'), findsOneWidget);
+
+    await tester.tap(find.text('Custom Trigger 0'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets('SubPickerTile uses itemBuilder', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubPickerTile<int>(
+            title: 'Sub Picker',
+            config: PickerConfig(
+              loadItems: (_) async => [1, 2],
+              idOf: (i) => i,
+              labelOf: (i) => '$i',
+              searchTermsOf: (_) => [],
+            ),
+            initialSelectedIds: const [],
+            itemBuilder: (context, item, isSelected, onToggle) {
+              return ListTile(
+                title: Text('Custom Item $item'),
+                selected: isSelected,
+                onTap: () => onToggle(!isSelected),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Sub Picker'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Custom Item 1'), findsOneWidget);
+    expect(find.text('Custom Item 2'), findsOneWidget);
+
+    await tester.tap(find.text('Custom Item 1'));
+    await tester.pump();
+  });
 }

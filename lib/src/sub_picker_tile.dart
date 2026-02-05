@@ -19,6 +19,8 @@ class SubPickerTile<T> extends StatelessWidget {
     this.leading,
     this.subtitle,
     this.trailing,
+    this.triggerBuilder,
+    this.itemBuilder,
   });
 
   /// Title shown on the tile.
@@ -50,19 +52,39 @@ class SubPickerTile<T> extends StatelessWidget {
   /// Run AFTER parent synchronization (if [parentActions] is provided).
   final OnFinish? onFinish;
 
+  /// Optional builder for custom trigger widget.
+  ///
+  /// If provided, overrides [title], [subtitle], [leading], [trailing].
+  /// Receives [open] callback to trigger the picker and [tick] version.
+  final Widget Function(BuildContext context, VoidCallback open, int tick)?
+  triggerBuilder;
+
+  /// Optional builder for custom item rendering in the list.
+  final Widget Function(
+    BuildContext context,
+    T item,
+    bool isSelected,
+    ValueChanged<bool?> onToggle,
+  )?
+  itemBuilder;
+
   @override
   Widget build(BuildContext context) {
     return SearchAnchorPicker<T>(
       config: config,
       initialSelectedIds: initialSelectedIds,
       mode: mode,
-      triggerChild: ListTile(
-        leading: leading ?? (icon != null ? Icon(icon) : null),
-        title: Text(title),
-        subtitle: subtitle,
-        trailing: trailing,
-        dense: true,
-      ),
+      triggerChild: triggerBuilder == null
+          ? ListTile(
+              leading: leading ?? (icon != null ? Icon(icon) : null),
+              title: Text(title),
+              subtitle: subtitle,
+              trailing: trailing,
+              dense: true,
+            )
+          : null,
+      triggerBuilder: triggerBuilder,
+      itemBuilder: itemBuilder,
       onFinish: (ids, {required added, required removed}) async {
         if (parentActions != null) {
           // Sync behavior:
