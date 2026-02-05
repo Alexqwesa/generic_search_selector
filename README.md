@@ -116,6 +116,30 @@ class _PeoplePickerDemoState extends State<PeoplePickerDemo> {
 }
 ```
 
+## Nested Pickers
+
+You can use your own `SearchAnchorPicker` for nested pickers, or use the `SubPickerTile` helper in `headerBuilder` to create them easily (e.g., for filtering or adding items from another source).
+
+It handles synchronization with the parent picker:
+*   **Removals**: If items are removed in the sub-picker, they are automatically removed from the parent's pending selection.
+*   **Additions**: Added items are **NOT** automatically selected in the parent (defaulting to "unselected"), giving you control.
+
+```dart
+SubPickerTile<MyItem>(
+  title: 'Add from Sub-list',
+  config: subConfig,
+  parentActions: actions, // Pass parent actions to automate removal cleanup
+  initialSelectedIds: currentSubIds,
+  onFinish: (ids, {required added, required removed}) async {
+      // 1. Update your data model (e.g. repository)
+      await myRepo.add(added);
+      await myRepo.remove(removed);
+      
+      // 2. Pending selection cleanup (removals) is handled automatically!
+  }
+)
+```
+
 ## TODO: 
 headerBuilder: (context, actions) => allUnitsHeader(context, actions, allJsas, ref),
 footerBuilder: 

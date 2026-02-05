@@ -362,6 +362,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
               close: _close,
               mode: widget.mode,
               getKey: _getKey,
+              refresh: _reload,
             );
 
             final header = widget.headerBuilder != null

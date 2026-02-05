@@ -99,6 +99,36 @@ class PickerConfig<T> {
   /// Predicate to check if an item is currently "in use" externally.
   /// If true, [unselectBehavior] will be triggered on deselection.
   final bool Function(T)? isItemInUse;
+
+  PickerConfig<T> copyWith({
+    LoadItems<T>? loadItems,
+    int Function(T)? idOf,
+    String Function(T)? labelOf,
+    Iterable<String> Function(T)? searchTermsOf,
+    String Function(T)? tooltipOf,
+    Widget Function(T)? iconOf,
+    int Function(T a, T b)? comparator,
+    String? title,
+    bool? selectedFirst,
+    Listenable? listenable,
+    UnselectBehavior? unselectBehavior,
+    bool Function(T)? isItemInUse,
+  }) {
+    return PickerConfig<T>(
+      loadItems: loadItems ?? this.loadItems,
+      idOf: idOf ?? this.idOf,
+      labelOf: labelOf ?? this.labelOf,
+      searchTermsOf: searchTermsOf ?? this.searchTermsOf,
+      tooltipOf: tooltipOf ?? this.tooltipOf,
+      iconOf: iconOf ?? this.iconOf,
+      comparator: comparator ?? this.comparator,
+      title: title ?? this.title,
+      selectedFirst: selectedFirst ?? this.selectedFirst,
+      listenable: listenable ?? this.listenable,
+      unselectBehavior: unselectBehavior ?? this.unselectBehavior,
+      isItemInUse: isItemInUse ?? this.isItemInUse,
+    );
+  }
 }
 
 typedef OnFinish =
@@ -130,12 +160,14 @@ class PickerActions<T> {
     required this.close,
     required this.mode,
     required this.getKey,
+    required this.refresh,
   });
 
   final ValueNotifier<Set<int>> pendingN;
   final int Function(T) idOf;
   final void Function([String? reason]) close;
   final GlobalKey Function(Object id) getKey;
+  final VoidCallback refresh;
   final PickerMode mode;
 
   Set<int> get pending => pendingN.value;

@@ -221,41 +221,42 @@ class _DemoHomeState extends State<DemoHome> {
                     // Header has two sub pickers that modify listA contents
                     headerBuilder: (ctx, actions, allItems) {
                       return [
-                        _SubPickerTile(
+                        SubPickerTile<DemoItem>(
+                          parentActions: actions,
                           key: actions.getKey('subA1'),
                           title: 'Add/remove from Sub A1',
                           icon: Icons.playlist_add,
                           config: subA1Config,
+                          initialSelectedIds: _intersectionIds(
+                            listA.items,
+                            subA1.items,
+                          ),
+                          onFinish:
+                              (ids, {required added, required removed}) async {
+                                final addItems = added
+                                    .map((id) => findById(subA1.items, id))
+                                    .whereType<DemoItem>()
+                                    .toList();
 
-                          // Seed ONLY items that came from this sub list.
-                          seedIds: _intersectionIds(listA.items, subA1.items),
-
-                          onFinish: (ids, {required added, required removed}) async {
-                            final addItems = added
-                                .map((id) => findById(subA1.items, id))
-                                .whereType<DemoItem>()
-                                .toList();
-
-                            setState(() {
-                              listA.addAll(addItems, same);
-                              listA.removeWhere((x) => removed.contains(x.id));
-
-                              // Keep screen chips consistent if an item disappears from listA.
-                              _removeDanglingSelectionsA();
-                            });
-
-                            // If main picker overlay is open, also clear pending for removed ids.
-                            final nextPending = {...actions.pending}
-                              ..removeAll(removed);
-                            actions.setPending(nextPending);
-                          },
+                                setState(() {
+                                  listA.addAll(addItems, same);
+                                  listA.removeWhere(
+                                    (x) => removed.contains(x.id),
+                                  );
+                                  _removeDanglingSelectionsA();
+                                });
+                              },
                         ),
-                        _SubPickerTile(
+                        SubPickerTile<DemoItem>(
+                          parentActions: actions,
                           key: actions.getKey('subA2'),
                           title: 'Add/remove from Sub A2',
                           icon: Icons.playlist_add_check,
                           config: subA2Config,
-                          seedIds: _intersectionIds(listA.items, subA2.items),
+                          initialSelectedIds: _intersectionIds(
+                            listA.items,
+                            subA2.items,
+                          ),
                           onFinish:
                               (ids, {required added, required removed}) async {
                                 final addItems = added
@@ -270,10 +271,6 @@ class _DemoHomeState extends State<DemoHome> {
                                   );
                                   _removeDanglingSelectionsA();
                                 });
-
-                                final nextPending = {...actions.pending}
-                                  ..removeAll(removed);
-                                actions.setPending(nextPending);
                               },
                         ),
                         const Divider(height: 1),
@@ -354,33 +351,32 @@ class _DemoHomeState extends State<DemoHome> {
 
                     headerBuilder: (ctx, actions, allItems) {
                       return [
-                        _SubPickerTile(
+                        SubPickerTile<DemoItem>(
+                          parentActions: actions,
                           key: actions.getKey('subB1'),
                           title: 'Select from Sub B1 (to screen)',
                           icon: Icons.person_add_alt_1,
                           config: subB1Config,
-                          seedIds: _ids(selectedOnScreenB),
-                          onFinish:
-                              (ids, {required added, required removed}) async {
-                                setState(() {
-                                  selectedOnScreenB
-                                    ..addAll(added)
-                                    ..removeAll(removed);
-                                });
-
-                                // Also update main overlay checkboxes immediately.
-                                final nextPending = {...actions.pending}
-                                  ..addAll(added)
-                                  ..removeAll(removed);
-                                actions.setPending(nextPending);
-                              },
+                          initialSelectedIds: _ids(selectedOnScreenB),
+                          onFinish: (ids, {required added, required removed}) async {
+                            setState(() {
+                              selectedOnScreenB
+                                ..addAll(added)
+                                ..removeAll(removed);
+                            });
+                            // For this use case (screen selection), we want to ADD added items to pending too.
+                            // But SubPickerTile only removes. So we manually mix in added items.
+                            final next = {...actions.pending, ...added};
+                            actions.setPending(next);
+                          },
                         ),
-                        _SubPickerTile(
+                        SubPickerTile<DemoItem>(
+                          parentActions: actions,
                           key: actions.getKey('subB2'),
                           title: 'Select from Sub B2 (to screen)',
                           icon: Icons.person_add_alt,
                           config: subB2Config,
-                          seedIds: _ids(selectedOnScreenB),
+                          initialSelectedIds: _ids(selectedOnScreenB),
                           onFinish:
                               (ids, {required added, required removed}) async {
                                 setState(() {
@@ -388,11 +384,8 @@ class _DemoHomeState extends State<DemoHome> {
                                     ..addAll(added)
                                     ..removeAll(removed);
                                 });
-
-                                final nextPending = {...actions.pending}
-                                  ..addAll(added)
-                                  ..removeAll(removed);
-                                actions.setPending(nextPending);
+                                final next = {...actions.pending, ...added};
+                                actions.setPending(next);
                               },
                         ),
                         const Divider(height: 1),
@@ -584,40 +577,6 @@ class _CircleIconTrigger extends StatelessWidget {
         highlightShape: BoxShape.circle,
         child: ClipOval(child: child),
       ),
-    );
-  }
-}
-
-/// Sub-picker shown as a header tile that opens its own overlay.
-class _SubPickerTile extends StatelessWidget {
-  const _SubPickerTile({
-    super.key,
-    required this.title,
-    required this.icon,
-    required this.config,
-    required this.seedIds,
-    required this.onFinish,
-  });
-
-  final String title;
-  final IconData icon;
-  final PickerConfig<DemoItem> config;
-
-  /// Which ids should be selected when opening the sub picker.
-  final List<int> seedIds;
-
-  final OnFinish onFinish;
-
-  @override
-  Widget build(BuildContext context) {
-    return SearchAnchorPicker<DemoItem>(
-      config: config,
-      initialSelectedIds: seedIds,
-      mode: PickerMode.multi,
-      triggerChild: ListTile(leading: Icon(icon), title: Text(title)),
-      onFinish: onFinish,
-      maxHeight: MediaQuery.sizeOf(context).height * 2 / 3,
-      minWidth: 520,
     );
   }
 }
