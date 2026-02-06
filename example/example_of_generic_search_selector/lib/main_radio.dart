@@ -37,8 +37,16 @@ class RadioHome extends StatefulWidget {
 
 class _RadioHomeState extends State<RadioHome> {
   int? selectedId;
-  int? selectedParentId; // For the parent picker test
-  int? selectedSubId; // For testing sub-pickers in radio mode
+
+  int? _unifiedSelectedId;
+  List<DemoItem> _extraItems = [];
+  final _refreshNotifier = ValueNotifier<int>(0);
+
+  @override
+  void dispose() {
+    _refreshNotifier.dispose();
+    super.dispose();
+  }
 
   final List<DemoItem> mainItems = [
     const DemoItem(id: 1, label: 'Main 1'),
@@ -115,7 +123,9 @@ class _RadioHomeState extends State<RadioHome> {
                         iconSize: 40,
                         onPressed: open,
                         icon: Icon(
-                          has ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                          has
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
                           color: has ? Colors.green : null,
                         ),
                       );
@@ -135,14 +145,11 @@ class _RadioHomeState extends State<RadioHome> {
               children: [
                 _SelectedChips(
                   title: 'Selected Parent/Sub Item',
-                  ids: {
-                    if (selectedParentId != null) selectedParentId!,
-                    if (selectedSubId != null) selectedSubId!,
-                  },
+                  ids: _unifiedSelectedId == null ? {} : {_unifiedSelectedId!},
                   universe: u,
                   onClear: () => setState(() {
-                    selectedParentId = null;
-                    selectedSubId = null;
+                    _unifiedSelectedId = null;
+                    _extraItems.clear(); // Clear transient items on clear
                   }),
                 ),
                 const SizedBox(height: 12),
@@ -150,16 +157,27 @@ class _RadioHomeState extends State<RadioHome> {
                   child: SearchAnchorPicker<DemoItem>(
                     config: PickerConfig<DemoItem>(
                       title: 'Radio Parent',
-                      loadItems: (_) async => mainItems,
+                      loadItems: (_) async => [...mainItems, ..._extraItems],
                       idOf: (it) => it.id,
                       labelOf: (it) => it.label,
                       searchTermsOf: (it) => [it.label],
+                      listenable: _refreshNotifier,
                     ),
                     mode: PickerMode.radio,
-                    initialSelectedIds: selectedParentId == null ? [] : [selectedParentId!],
+                    initialSelectedIds: _unifiedSelectedId == null
+                        ? []
+                        : [_unifiedSelectedId!],
                     onToggle: (item, next) async {
                       if (next) {
-                        setState(() => selectedParentId = item.id);
+                        setState(() {
+                          _unifiedSelectedId = item.id;
+                          // If we picked a main item, clear any transient sub items
+                          // (unless this item IS the transient item, but here we assume mainItems are distinct)
+                          if (!subItems.contains(item)) {
+                            _extraItems.clear();
+                            _refreshNotifier.value++;
+                          }
+                        });
                         return true;
                       }
                       return false;
@@ -197,10 +215,18 @@ class _RadioHomeState extends State<RadioHome> {
                           title: Text('Sub Radio Trigger (Tile)'),
                           leading: Icon(Icons.touch_app),
                         ),
-                        initialSelectedIds: selectedSubId == null ? [] : [selectedSubId!],
+                        initialSelectedIds: _unifiedSelectedId == null
+                            ? []
+                            : [_unifiedSelectedId!],
                         onToggle: (item, next) async {
                           if (next) {
-                            setState(() => selectedSubId = item.id);
+                            setState(() {
+                              _unifiedSelectedId = item.id;
+                              // Add to transient items so it shows in parent list
+                              _extraItems = [item];
+                              // Force parent picker to reload immediately so it shows this new item
+                              _refreshNotifier.value++;
+                            });
                             return true;
                           }
                           return false;
@@ -208,7 +234,7 @@ class _RadioHomeState extends State<RadioHome> {
                       ),
                     ],
                     triggerBuilder: (_, open, version) {
-                      final has = selectedParentId != null || selectedSubId != null;
+                      final has = _unifiedSelectedId != null;
                       return IconButton(
                         tooltip: 'Open parent picker',
                         iconSize: 40,
@@ -288,7 +314,10 @@ class _SelectedChips extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [for (final id in list) Chip(label: Text(universe[id]?.label ?? '#$id'))],
+                children: [
+                  for (final id in list)
+                    Chip(label: Text(universe[id]?.label ?? '#$id')),
+                ],
               ),
           ],
         ),

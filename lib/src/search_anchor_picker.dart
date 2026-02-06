@@ -165,8 +165,9 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
       _attachListenable(widget.config.listenable);
     }
 
-    // Sync from external seed ONLY when overlay is not open.
-    if (!_open && !_listEqualsInt(oldWidget.initialSelectedIds, widget.initialSelectedIds)) {
+    // Sync from external seed.
+    // We allow this even if open, to support use cases like "Sub Picker" updating valid selection.
+    if (!_listEqualsInt(oldWidget.initialSelectedIds, widget.initialSelectedIds)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _pendingN.value = widget.initialSelectedIds.toSet();
       });
