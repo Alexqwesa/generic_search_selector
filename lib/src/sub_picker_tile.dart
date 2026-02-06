@@ -63,7 +63,7 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
     BuildContext context,
     T item,
     bool isSelected,
-    ValueChanged<bool?> onToggle,
+    VoidCallback toggle,
   )?
   itemBuilder;
 

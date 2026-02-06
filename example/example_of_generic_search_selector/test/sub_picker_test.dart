@@ -145,7 +145,7 @@ void main() {
               return ListTile(
                 title: Text('Custom Item $item'),
                 selected: isSelected,
-                onTap: () => onToggle(!isSelected),
+                onTap: onToggle,
               );
             },
           ),
