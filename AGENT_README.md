@@ -11,15 +11,21 @@ The main widget that opens a search view (Overlay).
 - **`mode`**: `PickerMode` - `multi` (default), `radio`, or `radioToggle`.
 - **`initialSelectedIds`**: `List<int>` - Seeds the initial selection state.
 - **`onToggle`**: `Future<bool> Function(T item, bool next)` - Intercepts selection events. Return `true` to allow change.
+- **`itemBuilder`**: `Widget Function(...)` - (Optional) Completely custom renderer for list items.
 - **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
 - **`triggerBuilder`**: Defines the widget (button/icon) that opens the picker.
+- **Other Props**: `maxHeight`, `minWidth`, `searchController`, `iconWhenEmpty`, `iconWhenSelected`.
 
 ### `PickerConfig<T>`
 Configuration object for the picker.
 - **`loadItems`**: `Future<List<T>> Function(BuildContext)` - Loads the list of selectable items.
 - **`idOf`**: `int Function(T)` - Unique ID for each item.
 - **`labelOf`**: `String Function(T)` - Display label.
+- **`iconOf`**: `Widget Function(T)?` - Optional icon for the list tile.
+- **`tooltipOf`**: `String Function(T)?` - Custom tooltip (default falls back to label if overflowing).
+- **`comparator`**: `int Function(T, T)?` - Sorter for the list items.
 - **`listenable`**: `Listenable?` - Triggers a reload of `loadItems` when notified (e.g., `ValueNotifier`).
+- **`unselectBehavior`**: `UnselectBehavior` - (`allow`, `prevent`, `alert`) - Controls deselecting items in use.
 - **`autoRemoveDanglingSelections`**: `bool` (Default `false`).
     - If `true`, the picker automatically cleans up selected IDs that are no longer present in the loaded universe.
     - **Use Case**: When a sub-picker removes items from the parent's data source, this flag ensures the parent picker unchecks them immediately. (Added in `main_radio.dart` refactor).
