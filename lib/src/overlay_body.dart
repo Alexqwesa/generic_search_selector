@@ -137,11 +137,17 @@ class _OverlayBodyState<T> extends State<OverlayBody<T>> {
                               // Re-read latest after awaits.
                               final current = widget.pendingN.value;
 
-                              if (widget.mode == PickerMode.radio) {
-                                widget.pendingN.value = {id};
-                                widget.close(
-                                  'radio',
-                                ); // safe: close() schedules idle pop
+                              if (widget.mode == PickerMode.radio ||
+                                  widget.mode == PickerMode.radioToggle) {
+                                // radioToggle: if next is false (unselecting), we allow it -> empty set.
+                                // radio: we do NOT allow unselecting (must pick something).
+                                if (!next && widget.mode == PickerMode.radio) {
+                                  // Re-selecting same item in normal radio mode -> no-op/change nothing
+                                  return;
+                                }
+
+                                widget.pendingN.value = next ? {id} : {};
+                                widget.close('radio');
                                 return;
                               }
 
@@ -206,7 +212,9 @@ class _OverlayBodyState<T> extends State<OverlayBody<T>> {
                             }
 
                             return CheckboxListTile(
-                              checkboxShape: widget.mode == PickerMode.radio
+                              checkboxShape:
+                                  (widget.mode == PickerMode.radio ||
+                                      widget.mode == PickerMode.radioToggle)
                                   ? const CircleBorder()
                                   : null,
                               value: checked,

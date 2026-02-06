@@ -164,7 +164,7 @@ typedef OnFinish =
       required List<int> removed,
     });
 
-enum PickerMode { multi, radio }
+enum PickerMode { multi, radio, radioToggle }
 
 enum UnselectBehavior {
   block,
