@@ -55,7 +55,7 @@ class _OverlayBodyState<T> extends State<OverlayBody<T>> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           widget.close(null, true);
         }

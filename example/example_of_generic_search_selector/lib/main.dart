@@ -152,11 +152,6 @@ class _DemoHomeState extends State<DemoHome> {
     return out;
   }
 
-  void _removeDanglingSelectionsA() {
-    final valid = listA.items.map((e) => e.id).toSet();
-    selectedOnScreenA.removeWhere((id) => !valid.contains(id));
-  }
-
   @override
   void dispose() {
     listA.dispose();
@@ -172,7 +167,10 @@ class _DemoHomeState extends State<DemoHome> {
   Widget build(BuildContext context) {
     final universe = buildUniverse();
 
-    final mainAConfig = configForRepo(listA, title: 'Icon #1 main list');
+    final mainAConfig = configForRepo(
+      listA,
+      title: 'Icon #1 main list',
+    ).copyWith(autoRemoveDanglingSelections: true);
     final subA1Config = configForRepo(
       subA1,
       title: 'Sub A1',
@@ -250,7 +248,6 @@ class _DemoHomeState extends State<DemoHome> {
                                   listA.removeWhere(
                                     (x) => removed.contains(x.id),
                                   );
-                                  _removeDanglingSelectionsA();
                                 });
                               },
                         ),
@@ -276,7 +273,6 @@ class _DemoHomeState extends State<DemoHome> {
                                   listA.removeWhere(
                                     (x) => removed.contains(x.id),
                                   );
-                                  _removeDanglingSelectionsA();
                                 });
                               },
                         ),
@@ -515,7 +511,7 @@ class _DemoHomeState extends State<DemoHome> {
                 ),
               ],
             ),
-            SizedBox.square(dimension: 600,)
+            SizedBox.square(dimension: 600),
           ],
         ),
       ),

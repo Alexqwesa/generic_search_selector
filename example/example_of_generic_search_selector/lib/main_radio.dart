@@ -157,6 +157,7 @@ class _RadioHomeState extends State<RadioHome> {
                   child: SearchAnchorPicker<DemoItem>(
                     config: PickerConfig<DemoItem>(
                       title: 'Radio Parent',
+                      autoRemoveDanglingSelections: true,
                       loadItems: (_) async => [...mainItems, ..._extraItems],
                       idOf: (it) => it.id,
                       labelOf: (it) => it.label,

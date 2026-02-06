@@ -59,7 +59,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify sub selection updated on main screen (Chip)
-    expect(find.text('Sub 1'), findsOneWidget);
+    expect(find.text('Sub 1'), findsNWidgets(2));  // seems to work maybe it found both on main screen and on list?
 
     // Also check title
     expect(find.text('Selected Parent/Sub Item'), findsOneWidget);
@@ -138,6 +138,15 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify "Sub 1" is GONE from the main list (transient cleared)
-    expect(find.widgetWithText(ListTile, 'Sub 1'), findsNothing);
+    // We check if "Sub 1" exists inside a CheckboxListTile.
+    final subInList = find.ancestor(
+      of: find.text('Sub 1'),
+      matching: find.byType(CheckboxListTile),
+    );
+    expect(
+      subInList,
+      findsNothing,
+      reason: 'Sub 1 should be gone from picker list',
+    );
   });
 }

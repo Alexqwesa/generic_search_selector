@@ -27,6 +27,7 @@ class PickerConfig<T> {
     this.listenable,
     this.unselectBehavior = UnselectBehavior.allow,
     this.isItemInUse,
+    this.autoRemoveDanglingSelections = false,
   });
 
   /// internal callback to open the picker. (Set by SearchAnchorPicker).
@@ -126,6 +127,16 @@ class PickerConfig<T> {
   /// If true, [unselectBehavior] will be triggered on deselection.
   final bool Function(T)? isItemInUse;
 
+  /// If true, the picker will automatically filter out selections (IDs) from [pendingN]
+  /// that are not present in the loaded `items` list after a reload.
+  ///
+  /// This is useful when items can be removed externally (e.g. via a sub-picker)
+  /// and you want the parent picker to immediately reflect that removal without
+  /// manual state management.
+  ///
+  /// Default is `false` to avoid accidental data loss if `loadItems` returns partial results.
+  final bool autoRemoveDanglingSelections;
+
   PickerConfig<T> copyWith({
     LoadItems<T>? loadItems,
     int Function(T)? idOf,
@@ -139,6 +150,7 @@ class PickerConfig<T> {
     Listenable? listenable,
     UnselectBehavior? unselectBehavior,
     bool Function(T)? isItemInUse,
+    bool? autoRemoveDanglingSelections,
   }) {
     return PickerConfig<T>(
       loadItems: loadItems ?? this.loadItems,
@@ -153,6 +165,8 @@ class PickerConfig<T> {
       listenable: listenable ?? this.listenable,
       unselectBehavior: unselectBehavior ?? this.unselectBehavior,
       isItemInUse: isItemInUse ?? this.isItemInUse,
+      autoRemoveDanglingSelections:
+          autoRemoveDanglingSelections ?? this.autoRemoveDanglingSelections,
     );
   }
 }
