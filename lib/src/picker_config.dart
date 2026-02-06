@@ -13,8 +13,8 @@ typedef LoadItems<T> = Future<List<T>> Function(BuildContext context);
 /// The picker keeps a stable “in-overlay” selection while open:
 /// changes to [initialSelectedIds] from outside will not clobber the user’s
 /// pending selection until the overlay is closed.
-class PickerConfig<T> {
-  PickerConfig({
+class GenericPickerConfig<T, K> {
+  GenericPickerConfig({
     required this.loadItems,
     required this.idOf,
     required this.labelOf,
@@ -62,13 +62,13 @@ class PickerConfig<T> {
   /// to refresh). Keep it fast; cache upstream if needed.
   final LoadItems<T> loadItems;
 
-  /// Returns a stable integer identifier for [T].
+  /// Returns a stable identifier for [T].
   ///
   /// Used for:
-  /// - selection state (Set<int>)
+  /// - selection state (Set<K>)
   /// - computing added/removed diffs on close
   /// - equality / matching across reloads
-  final int Function(T) idOf;
+  final K Function(T) idOf;
 
   /// Returns the primary label shown in the list for [T].
   ///
@@ -137,6 +137,58 @@ class PickerConfig<T> {
   /// Default is `false` to avoid accidental data loss if `loadItems` returns partial results.
   final bool autoRemoveDanglingSelections;
 
+  GenericPickerConfig<T, K> copyWith({
+    LoadItems<T>? loadItems,
+    K Function(T)? idOf,
+    String Function(T)? labelOf,
+    Iterable<String> Function(T)? searchTermsOf,
+    String Function(T)? tooltipOf,
+    Widget Function(T)? iconOf,
+    int Function(T a, T b)? comparator,
+    String? title,
+    bool? selectedFirst,
+    Listenable? listenable,
+    UnselectBehavior? unselectBehavior,
+    bool Function(T)? isItemInUse,
+    bool? autoRemoveDanglingSelections,
+  }) {
+    return GenericPickerConfig<T, K>(
+      loadItems: loadItems ?? this.loadItems,
+      idOf: idOf ?? this.idOf,
+      labelOf: labelOf ?? this.labelOf,
+      searchTermsOf: searchTermsOf ?? this.searchTermsOf,
+      tooltipOf: tooltipOf ?? this.tooltipOf,
+      iconOf: iconOf ?? this.iconOf,
+      comparator: comparator ?? this.comparator,
+      title: title ?? this.title,
+      selectedFirst: selectedFirst ?? this.selectedFirst,
+      listenable: listenable ?? this.listenable,
+      unselectBehavior: unselectBehavior ?? this.unselectBehavior,
+      isItemInUse: isItemInUse ?? this.isItemInUse,
+      autoRemoveDanglingSelections:
+          autoRemoveDanglingSelections ?? this.autoRemoveDanglingSelections,
+    );
+  }
+}
+
+class PickerConfig<T> extends GenericPickerConfig<T, int> {
+  PickerConfig({
+    required super.loadItems,
+    required super.idOf,
+    required super.labelOf,
+    required super.searchTermsOf,
+    super.tooltipOf,
+    super.iconOf,
+    super.comparator,
+    super.title,
+    super.selectedFirst = true,
+    super.listenable,
+    super.unselectBehavior = UnselectBehavior.allow,
+    super.isItemInUse,
+    super.autoRemoveDanglingSelections = false,
+  });
+
+  @override
   PickerConfig<T> copyWith({
     LoadItems<T>? loadItems,
     int Function(T)? idOf,
@@ -171,12 +223,14 @@ class PickerConfig<T> {
   }
 }
 
-typedef OnFinish =
+typedef GenericOnFinish<K> =
     Future<void> Function(
-      List<int> finalIds, {
-      required List<int> added,
-      required List<int> removed,
+      List<K> finalIds, {
+      required List<K> added,
+      required List<K> removed,
     });
+
+typedef OnFinish = GenericOnFinish<int>;
 
 enum PickerMode { multi, radio, radioToggle }
 
@@ -193,8 +247,8 @@ enum UnselectBehavior {
 /// This is intentionally thin:
 /// - It operates on the in-overlay pending selection only.
 /// - It never calls setState; it only updates [pendingN] and closes the picker.
-class PickerActions<T> {
-  PickerActions({
+class GenericPickerActions<T, K> {
+  GenericPickerActions({
     required this.pendingN,
     required this.idOf,
     required this.close,
@@ -203,26 +257,37 @@ class PickerActions<T> {
     required this.refresh,
   });
 
-  final ValueNotifier<Set<int>> pendingN;
-  final int Function(T) idOf;
+  final ValueNotifier<Set<K>> pendingN;
+  final K Function(T) idOf;
   final void Function([String? reason]) close;
   final GlobalKey Function(Object id) getKey;
   final VoidCallback refresh;
   final PickerMode mode;
 
-  Set<int> get pending => pendingN.value;
+  Set<K> get pending => pendingN.value;
 
-  void setPending(Set<int> ids) => pendingN.value = ids;
+  void setPending(Set<K> ids) => pendingN.value = ids;
 
-  void selectAll(Iterable<int> ids) => setPending(ids.toSet());
+  void selectAll(Iterable<K> ids) => setPending(ids.toSet());
 
-  void selectNone() => setPending(<int>{});
+  void selectNone() => setPending(<K>{});
 
-  void toggleId(int id, bool next) {
+  void toggleId(K id, bool next) {
     final s = {...pending};
     next ? s.add(id) : s.remove(id);
     setPending(s);
   }
+}
+
+class PickerActions<T> extends GenericPickerActions<T, int> {
+  PickerActions({
+    required super.pendingN,
+    required super.idOf,
+    required super.close,
+    required super.mode,
+    required super.getKey,
+    required super.refresh,
+  });
 }
 
 enum CloseQueryBehavior { keep, clear }

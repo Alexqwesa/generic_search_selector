@@ -1,0 +1,137 @@
+import 'package:example_of_generic_search_selector/main.dart'; // for DemoItem
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:generic_search_selector/generic_search_selector.dart';
+
+void main() {
+  testWidgets('Generic Selection: String IDs', (tester) async {
+    final items = <DemoItem>[
+      const DemoItem(id: 1, label: 'Item 1', group: 'A'),
+      const DemoItem(id: 2, label: 'Item 2', group: 'A'),
+      const DemoItem(id: 3, label: 'Item 3', group: 'A'),
+    ];
+
+    final log = <List<String>>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: GenericSearchAnchorPicker<DemoItem, String>(
+              initialSelectedIds: const <String>['2'],
+              config: GenericPickerConfig<DemoItem, String>(
+                loadItems: (context) async => items,
+                idOf: (item) => item.id.toString(), // ID is String "1", "2"...
+                labelOf: (item) => item.label,
+                searchTermsOf: (item) => [item.label],
+              ),
+              onFinish: (ids, {required added, required removed}) async {
+                log.add(ids);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+
+    // Verify "Item 2" is selected (checkbox checked)
+    final cb2 = tester.widget<CheckboxListTile>(
+      find.ancestor(
+        of: find.text('Item 2'),
+        matching: find.byType(CheckboxListTile),
+      ),
+    );
+    expect(cb2.value, isTrue);
+
+    // Select "Item 1"
+    await tester.tap(find.text('Item 1'));
+    await tester.pump();
+
+    // Verify selection updated
+    var cb1 = tester.widget<CheckboxListTile>(
+      find.ancestor(
+        of: find.text('Item 1'),
+        matching: find.byType(CheckboxListTile),
+      ),
+    );
+    expect(cb1.value, isTrue);
+
+    // Close
+    await tester.tapAt(const Offset(1, 1)); // Tap outside
+    await tester.pumpAndSettle();
+
+    expect(log.length, 1);
+    expect(log.last, unorderedEquals(<String>['2', '1']));
+  });
+
+  testWidgets('Generic Selection: Record IDs (int, int)', (tester) async {
+    final items = <DemoItem>[
+      const DemoItem(id: 1, label: 'Item 1', group: 'A'),
+      const DemoItem(id: 2, label: 'Item 2', group: 'A'),
+      const DemoItem(id: 3, label: 'Item 3', group: 'A'),
+    ];
+
+    final log = <List<(int, int)>>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: GenericSearchAnchorPicker<DemoItem, (int, int)>(
+              initialSelectedIds: const <(int, int)>[(1, 100), (3, 300)],
+              config: GenericPickerConfig<DemoItem, (int, int)>(
+                loadItems: (context) async => items,
+                // ID is a tuple (id, id*100)
+                idOf: (item) => (item.id, item.id * 100),
+                labelOf: (item) => item.label,
+                searchTermsOf: (item) => [item.label],
+              ),
+              onFinish: (ids, {required added, required removed}) async {
+                log.add(ids);
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+
+    // Verify Item 1 ((1,100)) and Item 3 ((3,300)) are checked
+    final cb1 = tester.widget<CheckboxListTile>(
+      find.ancestor(
+        of: find.text('Item 1'),
+        matching: find.byType(CheckboxListTile),
+      ),
+    );
+    expect(cb1.value, isTrue);
+
+    final cb3 = tester.widget<CheckboxListTile>(
+      find.ancestor(
+        of: find.text('Item 3'),
+        matching: find.byType(CheckboxListTile),
+      ),
+    );
+    expect(cb3.value, isTrue);
+
+    // Unselect Item 1
+    await tester.tap(find.text('Item 1'));
+    await tester.pump();
+
+    // Select Item 2 ((2,200)) -> ID = (2, 200)
+    await tester.tap(find.text('Item 2'));
+    await tester.pump();
+
+    // Close
+    await tester.tapAt(const Offset(1, 1));
+    await tester.pumpAndSettle();
+
+    expect(log.length, 1);
+    // Should contain (3, 300) and (2, 200). (1, 100) was removed.
+    expect(log.last, unorderedEquals(<(int, int)>[(3, 300), (2, 200)]));
+  });
+}

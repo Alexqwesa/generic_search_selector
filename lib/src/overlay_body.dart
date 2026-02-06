@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:generic_search_selector/src/overflow_tooltip_text.dart';
 import 'package:generic_search_selector/src/picker_config.dart';
 
-class OverlayBody<T> extends StatefulWidget {
+class OverlayBody<T, K> extends StatefulWidget {
   const OverlayBody({
     super.key,
     required this.header,
@@ -23,10 +23,10 @@ class OverlayBody<T> extends StatefulWidget {
   final List<T> stableOrder;
 
   final SearchController ctrl;
-  final ValueNotifier<Set<int>> pendingN;
+  final ValueNotifier<Set<K>> pendingN;
 
   final PickerMode mode;
-  final PickerConfig<T> config;
+  final GenericPickerConfig<T, K> config;
 
   final Future<bool> Function(T item, bool nextSelected)? onToggleGate;
   final void Function([String? reason, bool skipCloseView]) close;
@@ -39,10 +39,10 @@ class OverlayBody<T> extends StatefulWidget {
   itemBuilder;
 
   @override
-  State<OverlayBody<T>> createState() => _OverlayBodyState<T>();
+  State<OverlayBody<T, K>> createState() => _OverlayBodyState<T, K>();
 }
 
-class _OverlayBodyState<T> extends State<OverlayBody<T>> {
+class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
   final ScrollController _scroll = ScrollController();
 
   @override
@@ -93,7 +93,7 @@ class _OverlayBodyState<T> extends State<OverlayBody<T>> {
                     controller: _scroll,
                     thumbVisibility: true,
                     interactive: true,
-                    child: ValueListenableBuilder<Set<int>>(
+                    child: ValueListenableBuilder<Set<K>>(
                       valueListenable: widget.pendingN,
                       builder: (context, pendingSnapshot, __) {
                         return ListView.builder(

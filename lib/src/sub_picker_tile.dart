@@ -5,9 +5,9 @@ import 'package:generic_search_selector/src/search_anchor_picker.dart';
 /// A helper tile that opens a [SearchAnchorPicker] (sub-picker).
 ///
 /// Reduces boilerplate for the common pattern of nested pickers in the header.
-/// Can optionally synchronize selection changes with a parent [PickerActions].
-class SubPickerTile<T> extends StatelessWidget {
-  const SubPickerTile({
+/// Can optionally synchronize selection changes with a parent [GenericPickerActions].
+class GenericSubPickerTile<T, K> extends StatelessWidget {
+  const GenericSubPickerTile({
     super.key,
     required this.title,
     required this.config,
@@ -27,17 +27,17 @@ class SubPickerTile<T> extends StatelessWidget {
   final String? title;
 
   /// Configuration for the sub-picker.
-  final PickerConfig<T> config;
+  final GenericPickerConfig<T, K> config;
 
   /// IDs that should show as selected when the sub-picker opens.
-  final List<int> initialSelectedIds;
+  final List<K> initialSelectedIds;
 
   /// Optional parent actions to automatically sync changes to.
   ///
   /// If provided:
   /// - items added in sub-picker are added to parent pending selection.
   /// - items removed in sub-picker are removed from parent pending selection.
-  final PickerActions<T>? parentActions;
+  final GenericPickerActions<T, K>? parentActions;
 
   /// Icon to show leading the tile (convenience for [leading]).
   final IconData? icon;
@@ -50,7 +50,7 @@ class SubPickerTile<T> extends StatelessWidget {
 
   /// Callback when sub-picker closes.
   /// Run AFTER parent synchronization (if [parentActions] is provided).
-  final OnFinish? onFinish;
+  final GenericOnFinish<K>? onFinish;
 
   /// Optional builder for custom trigger widget.
   ///
@@ -59,7 +59,6 @@ class SubPickerTile<T> extends StatelessWidget {
   final Widget Function(BuildContext context, VoidCallback open, int tick)?
   triggerBuilder;
 
-  /// Optional builder for custom item rendering in the list.
   final Widget Function(
     BuildContext context,
     T item,
@@ -70,21 +69,9 @@ class SubPickerTile<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SearchAnchorPicker<T>(
+    return GenericSearchAnchorPicker<T, K>(
       config: config,
       initialSelectedIds: initialSelectedIds,
-      mode: mode,
-      triggerChild: triggerBuilder == null
-          ? ListTile(
-              leading: leading ?? (icon != null ? Icon(icon) : null),
-              title: Text(title!),
-              subtitle: subtitle,
-              trailing: trailing,
-              dense: true,
-            )
-          : null,
-      triggerBuilder: triggerBuilder,
-      itemBuilder: itemBuilder,
       onFinish: (ids, {required added, required removed}) async {
         if (parentActions != null) {
           // Sync behavior:
@@ -98,6 +85,42 @@ class SubPickerTile<T> extends StatelessWidget {
           await onFinish!(ids, added: added, removed: removed);
         }
       },
+      mode: mode,
+      itemBuilder: itemBuilder,
+      triggerBuilder: (context, open, tick) {
+        if (triggerBuilder != null) {
+          return triggerBuilder!(context, open, tick);
+        }
+
+        return title != null
+            ? ListTile(
+                leading: leading ?? (icon != null ? Icon(icon) : null),
+                onTap: open,
+                title: Text(title!),
+                subtitle: subtitle,
+                trailing: trailing,
+                dense: true,
+              )
+            : const SizedBox(); // Should not happen due to assert
+      },
     );
   }
+}
+
+class SubPickerTile<T> extends GenericSubPickerTile<T, int> {
+  const SubPickerTile({
+    super.key,
+    required super.title,
+    required super.config,
+    required super.initialSelectedIds,
+    super.icon,
+    super.parentActions,
+    super.onFinish,
+    super.mode,
+    super.leading,
+    super.subtitle,
+    super.trailing,
+    super.triggerBuilder,
+    super.itemBuilder,
+  });
 }

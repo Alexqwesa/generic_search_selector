@@ -4,32 +4,45 @@ This repository implements a versatile, highly configurable **Search Anchor Pick
 
 ## 1. Core API Components
 
-### `SearchAnchorPicker<T>`
-The main widget that opens a search view (Overlay).
-- **Generic `<T>`**: The type of items being picked (e.g., `DemoItem`, `User`).
-- **`config`**: `PickerConfig<T>` (Required) - Defines behavior, data loading, and callbacks.
-- **`mode`**: `PickerMode` - `multi` (default), `radio`, or `radioToggle`.
-- **`initialSelectedIds`**: `List<int>` - Seeds the initial selection state.
-- **`onToggle`**: `Future<bool> Function(T item, bool next)` - Intercepts selection events. Return `true` to allow change.
-- **`itemBuilder`**: `Widget Function(...)` - (Optional) Completely custom renderer for list items.
-- **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
-- **`triggerBuilder`**: Defines the widget (button/icon) that opens the picker.
-- **Other Props**: `maxHeight`, `minWidth`, `searchController`, `iconWhenEmpty`, `iconWhenSelected`.
+### `GenericSearchAnchorPicker<T, K>`
+The main widget that opens a search view.
+- **Generic `<T>`**: item type.
+- **Generic `<K>`**: ID type (e.g. `int`, `String`, `UUID`).
+- **`config`**: `GenericPickerConfig<T, K>`.
 
-### `PickerConfig<T>`
-Configuration object for the picker.
+> **Note**: `SearchAnchorPicker<T>` is a convenient subclass fixed to `K=int`.
+
+### `GenericPickerConfig<T, K>`
+Configuration object.
 - **`loadItems`**: `Future<List<T>> Function(BuildContext)` - Loads the list of selectable items.
-- **`idOf`**: `int Function(T)` - Unique ID for each item.
+- **`idOf`**: `K Function(T)` - Returns unique ID (of type `K`).
 - **`labelOf`**: `String Function(T)` - Display label.
+- **`searchTermsOf`**: `Iterable<String> Function(T)` - Keywords for local search filtering.
 - **`iconOf`**: `Widget Function(T)?` - Optional icon for the list tile.
 - **`tooltipOf`**: `String Function(T)?` - Custom tooltip (default falls back to label if overflowing).
 - **`comparator`**: `int Function(T, T)?` - Sorter for the list items.
-- **`listenable`**: `Listenable?` - Triggers a reload of `loadItems` when notified (e.g., `ValueNotifier`).
+- **`listenable`**: `Listenable?` - triggers a reload of `loadItems` when notified (e.g., `ValueNotifier`).
 - **`unselectBehavior`**: `UnselectBehavior` - (`allow`, `prevent`, `alert`) - Controls deselecting items in use.
-- **`autoRemoveDanglingSelections`**: `bool` (Default `false`).
-    - If `true`, the picker automatically cleans up selected IDs that are no longer present in the loaded universe.
-    - **Use Case**: When a sub-picker removes items from the parent's data source, this flag ensures the parent picker unchecks them immediately. (Added in `main_radio.dart` refactor).
-- **`isItemInUse`**: Predicate to warn users before unselecting items used elsewhere.
+- **`autoRemoveDanglingSelections`**: `bool` (Default `false`) - Auto-removes selections not present in the current loaded list.
+- **`isItemInUse`**: `bool Function(T)?` - Predicate to warning users before unselecting items used elsewhere.
+- **`title`**: `String?` - Title used in tooltips.
+- **`selectedFirst`**: `bool` (Default `true`) - Whether selected items appear at the top.
+
+> **Note**: `PickerConfig<T>` extends `GenericPickerConfig<T, int>`.
+
+### `GenericPickerActions<T, K>`
+Actions interface exposed to `headerBuilder`. Use this to interact with the picker state *without* `setState`.
+- **`pending`**: `Set<K>` - Getter for the current in-overlay selection.
+- **`setPending(Set<K> ids)`**: Overwrite the entire selection.
+- **`toggleId(K id, bool next)`**: Toggle a single ID on or off.
+- **`selectAll(Iterable<K> ids)`**: Select a specific list of IDs.
+- **`selectNone()`**: Clear all selections.
+- **`refresh()`**: Trigger a reload of items from `loadItems`.
+- **`close([String? reason])`**: Close the picker programmatically.
+- **`getKey(Object id)`**: Get a stable `GlobalKey` for a header item (crucial for preserving state in sub-pickers).
+
+> **Note**: `PickerActions<T>` extends `GenericPickerActions<T, int>`.
+
 
 ---
 
@@ -45,6 +58,7 @@ Configuration object for the picker.
 
 ### Basic Setup
 ```dart
+// Standard Int IDs
 SearchAnchorPicker<MyItem>(
   config: PickerConfig<MyItem>(
     title: 'Select Users',

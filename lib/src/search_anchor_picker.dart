@@ -12,8 +12,8 @@ import 'package:generic_search_selector/src/picker_config.dart';
 /// - External seed ([initialSelectedIds]) is synced only when popup is not open
 /// - Close is always deferred (post-frame) to avoid overlay/build-scope assertions
 /// - Optional [PickerConfig.listenable] allows live updates (e.g. ChangeNotifier repo)
-class SearchAnchorPicker<T> extends StatefulWidget {
-  const SearchAnchorPicker({
+class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
+  const GenericSearchAnchorPicker({
     super.key,
     required this.config,
     required this.initialSelectedIds,
@@ -35,11 +35,11 @@ class SearchAnchorPicker<T> extends StatefulWidget {
     this.itemBuilder,
   });
 
-  final PickerConfig<T> config;
+  final GenericPickerConfig<T, K> config;
 
   /// External seed selection.
   /// While overlay is open, changes here will NOT clobber pending selection.
-  final List<int> initialSelectedIds;
+  final List<K> initialSelectedIds;
 
   final PickerMode mode;
 
@@ -47,7 +47,7 @@ class SearchAnchorPicker<T> extends StatefulWidget {
   final Future<bool> Function(T item, bool nextSelected)? onToggle;
 
   /// Called once when overlay closes (diff vs open snapshot).
-  final OnFinish? onFinish;
+  final GenericOnFinish<K>? onFinish;
 
   final SearchController? searchController;
 
@@ -67,7 +67,7 @@ class SearchAnchorPicker<T> extends StatefulWidget {
   /// Preferred: build header widgets with [PickerActions].
   final List<Widget> Function(
     BuildContext context,
-    PickerActions<T> actions,
+    GenericPickerActions<T, K> actions,
     List<T> allItems,
   )?
   headerBuilder;
@@ -90,19 +90,45 @@ class SearchAnchorPicker<T> extends StatefulWidget {
   itemBuilder;
 
   @override
-  State<SearchAnchorPicker<T>> createState() => _SearchAnchorPickerState<T>();
+  State<GenericSearchAnchorPicker<T, K>> createState() =>
+      _GenericSearchAnchorPickerState<T, K>();
 }
 
-class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
+class SearchAnchorPicker<T> extends GenericSearchAnchorPicker<T, int> {
+  const SearchAnchorPicker({
+    super.key,
+    required super.config,
+    required super.initialSelectedIds,
+    super.mode,
+    super.onToggle,
+    super.onFinish,
+    super.searchController,
+    super.triggerBuilder,
+    super.triggerChild,
+    super.iconWhenEmpty,
+    super.iconWhenSelected,
+    super.iconSize,
+    super.maxHeight,
+    super.minWidth,
+    super.headerBuilder,
+    super.headerTiles,
+    super.selectedFirst,
+    super.closeQueryBehavior,
+    super.itemBuilder,
+  });
+}
+
+class _GenericSearchAnchorPickerState<T, K>
+    extends State<GenericSearchAnchorPicker<T, K>> {
   late final SearchController _owned = SearchController();
 
   SearchController get _ctrl => widget.searchController ?? _owned;
 
-  late final ValueNotifier<Set<int>> _pendingN = ValueNotifier<Set<int>>(
+  late final ValueNotifier<Set<K>> _pendingN = ValueNotifier<Set<K>>(
     widget.initialSelectedIds.toSet(),
   );
 
-  Set<int> _openedSnapshot = <int>{};
+  Set<K> _openedSnapshot = <K>{};
   bool _open = false;
 
   int _tick = 0;
@@ -110,7 +136,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
 
   /// Stable order is derived from items at open time.
   /// While open, we keep the *relative* order stable but allow new items to appear.
-  List<int> _stableIds = <int>[];
+  List<K> _stableIds = <K>[];
 
   VoidCallback? _listenableCb;
 
@@ -128,7 +154,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
     widget.config.internalOnClose = ([reason]) => _close(reason);
   }
 
-  void _unbindConfigControl(PickerConfig<T> config) {
+  void _unbindConfigControl(GenericPickerConfig<T, K> config) {
     if (config.internalOnOpen == _requestOpen) config.internalOnOpen = null;
     // We can't identify the closure wrapper easily so we blindly clear it
     // assuming we are the owner.
@@ -170,7 +196,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
   }
 
   @override
-  void didUpdateWidget(covariant SearchAnchorPicker<T> oldWidget) {
+  void didUpdateWidget(covariant GenericSearchAnchorPicker<T, K> oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.config != widget.config) {
@@ -185,10 +211,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
 
     // Sync from external seed.
     // We allow this even if open, to support use cases like "Sub Picker" updating valid selection.
-    if (!_listEqualsInt(
-      oldWidget.initialSelectedIds,
-      widget.initialSelectedIds,
-    )) {
+    if (!_listEquals(oldWidget.initialSelectedIds, widget.initialSelectedIds)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _pendingN.value = widget.initialSelectedIds.toSet();
       });
@@ -230,7 +253,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
     _openedSnapshot = widget.initialSelectedIds.toSet();
     _pendingN.value = {..._openedSnapshot};
 
-    _stableIds = <int>[];
+    _stableIds = <K>[];
     _open = true;
 
     // Load items on open
@@ -392,7 +415,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
               _syncStableIds(items);
             }
 
-            final actions = PickerActions<T>(
+            final actions = GenericPickerActions<T, K>(
               pendingN: _pendingN,
               idOf: widget.config.idOf,
               close: _close,
@@ -406,7 +429,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
                 : (widget.headerTiles ?? const <Widget>[]);
 
             // Resolve stable order into actual items list.
-            final byId = <int, T>{
+            final byId = <K, T>{
               for (final it in items) widget.config.idOf(it): it,
             };
             final stableOrder = <T>[
@@ -414,7 +437,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
                 if (byId.containsKey(id)) byId[id]!,
             ];
 
-            return OverlayBody<T>(
+            return OverlayBody<T, K>(
               header: header,
               items: items,
               stableOrder: stableOrder.isEmpty ? items : stableOrder,
@@ -433,7 +456,7 @@ class _SearchAnchorPickerState<T> extends State<SearchAnchorPicker<T>> {
   }
 }
 
-bool _listEqualsInt(List<int> a, List<int> b) {
+bool _listEquals<T>(List<T> a, List<T> b) {
   if (identical(a, b)) return true;
   if (a.length != b.length) return false;
   for (var i = 0; i < a.length; i++) {
