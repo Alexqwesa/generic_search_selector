@@ -16,6 +16,9 @@ The main widget that opens a search view.
 Configuration object.
 - **`loadItems`**: `Future<List<T>> Function(BuildContext)` - Loads the list of selectable items.
 - **`idOf`**: `K Function(T)` - Returns unique ID (of type `K`).
+- **`onToggle`**: `Future<bool> Function(T item, bool next)` - Intercepts selection events. Return `true` to allow change.
+- **`itemBuilder`**: `Widget Function(BuildContext, T item, bool selected, VoidCallback toggle)` - (Optional) Custom renderer.
+- **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
 - **`labelOf`**: `String Function(T)` - Display label.
 - **`searchTermsOf`**: `Iterable<String> Function(T)` - Keywords for local search filtering.
 - **`iconOf`**: `Widget Function(T)?` - Optional icon for the list tile.
@@ -24,7 +27,9 @@ Configuration object.
 - **`listenable`**: `Listenable?` - triggers a reload of `loadItems` when notified (e.g., `ValueNotifier`).
 - **`unselectBehavior`**: `UnselectBehavior` - (`allow`, `prevent`, `alert`) - Controls deselecting items in use.
 - **`autoRemoveDanglingSelections`**: `bool` (Default `false`) - Auto-removes selections not present in the current loaded list.
-- **`isItemInUse`**: `bool Function(T)?` - Predicate to warning users before unselecting items used elsewhere.
+- **`isItemInUse`**: `bool Function(T)?` - **Required for UnselectBehavior**. Checks if an item is "in use" externally.
+    - If returns `true`: Triggers the configured `unselectBehavior` (e.g. show alert dialog) when user tries to unselect this item.
+    - If returns `false` (or null): Item is unselected immediately.
 - **`title`**: `String?` - Title used in tooltips.
 - **`selectedFirst`**: `bool` (Default `true`) - Whether selected items appear at the top.
 
@@ -39,7 +44,8 @@ Actions interface exposed to `headerBuilder`. Use this to interact with the pick
 - **`selectNone()`**: Clear all selections.
 - **`refresh()`**: Trigger a reload of items from `loadItems`.
 - **`close([String? reason])`**: Close the picker programmatically.
-- **`getKey(Object id)`**: Get a stable `GlobalKey` for a header item (crucial for preserving state in sub-pickers).
+- **`getKey(Object id)`**: Returns a **stable** `GlobalKey` mapped to the given `id`.
+    - **Crucial**: Use this instead of `GlobalKey()` for sub-pickers. `GlobalKey()` creates a new key every build, causing the sub-picker to lose state/close on parent rebuilds. `getKey(id)` returns the *cached* key.
 
 > **Note**: `PickerActions<T>` extends `GenericPickerActions<T, int>`.
 

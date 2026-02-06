@@ -85,7 +85,7 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
     BuildContext context,
     T item,
     bool isSelected,
-    ValueChanged<bool?> onToggle,
+    VoidCallback toggle,
   )?
   itemBuilder;
 

@@ -34,7 +34,7 @@ class OverlayBody<T, K> extends StatefulWidget {
     BuildContext context,
     T item,
     bool isSelected,
-    ValueChanged<bool?> onToggle,
+    VoidCallback toggle,
   )?
   itemBuilder;
 
@@ -207,7 +207,7 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                 context,
                                 item,
                                 checked,
-                                (v) => toggle(v ?? false),
+                                () => toggle(!checked),
                               );
                             }
 

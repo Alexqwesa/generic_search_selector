@@ -203,7 +203,7 @@ class _RadioHomeState extends State<RadioHome> {
                         itemBuilder: (context, item, isSelected, onToggle) {
                           return CheckboxListTile(
                             value: isSelected,
-                            onChanged: (v) => onToggle(v),
+                            onChanged: (v) => onToggle(),
                             title: Text(
                               item.label,
                               style: const TextStyle(color: Colors.blueAccent),
