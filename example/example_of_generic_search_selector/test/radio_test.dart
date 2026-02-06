@@ -1,5 +1,5 @@
 import 'package:example_of_generic_search_selector/main_radio.dart';
-
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -8,7 +8,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Open Basic Radio Picker
-    final trigger = find.text('Select Main');
+    final trigger = find.byTooltip('Open radio picker');
     expect(trigger, findsOneWidget);
     await tester.tap(trigger);
     await tester.pumpAndSettle();
@@ -19,12 +19,13 @@ void main() {
     await tester.tap(item1);
     await tester.pumpAndSettle();
 
-    // Verify selection text update
-    expect(find.text('Main: 1'), findsOneWidget);
-    expect(find.text('Selected: 1'), findsOneWidget);
+    // Verify selection text update (Chip)
+    expect(find.text('Main 1'), findsOneWidget);
+    // Title of the card
+    expect(find.text('Selected Main Item'), findsOneWidget);
 
     // 3. Re-open and select "Main 2"
-    await tester.tap(find.text('Main: 1'));
+    await tester.tap(trigger); // Open again
     await tester.pumpAndSettle();
 
     final item2 = find.text('Main 2');
@@ -32,8 +33,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify selection changed
-    expect(find.text('Main: 2'), findsOneWidget);
-    expect(find.text('Selected: 2'), findsOneWidget);
+    expect(find.text('Main 2'), findsOneWidget);
   });
 
   testWidgets('Radio Picker: Sub Picker Selection', (
@@ -43,10 +43,12 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Open Parent Picker with Sub
-    await tester.tap(find.text('Open Parent with Sub'));
+    final parentTrigger = find.byTooltip('Open parent picker');
+    await tester.tap(parentTrigger);
     await tester.pumpAndSettle();
 
-    // 2. Open Sub Picker
+    // 2. Open Sub Picker (inside parent overlay)
+    // The sub picker trigger is a ListTile with title 'Sub Radio Trigger (Tile)'
     await tester.tap(find.text('Sub Radio Trigger (Tile)'));
     await tester.pumpAndSettle();
 
@@ -56,8 +58,11 @@ void main() {
     await tester.tap(subItem1);
     await tester.pumpAndSettle();
 
-    // Verify sub selection updated on main screen
-    expect(find.text('Sub Selected: 10'), findsOneWidget);
+    // Verify sub selection updated on main screen (Chip)
+    expect(find.text('Sub 1'), findsOneWidget);
+
+    // Also check title
+    expect(find.text('Selected Parent/Sub Item'), findsOneWidget);
   });
 
   testWidgets('Radio Picker: Parent Selection with Sub', (
@@ -67,7 +72,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. Open Parent Picker with Sub
-    final trigger = find.text('Open Parent with Sub');
+    final trigger = find.byTooltip('Open parent picker');
     await tester.tap(trigger);
     await tester.pumpAndSettle();
 
@@ -77,11 +82,7 @@ void main() {
     await tester.tap(item2);
     await tester.pumpAndSettle();
 
-    // Verify selection updated on trigger button
-    // The current implementation is static ('Open Parent with Sub'), so this should fail if we expect dynamics.
-    // We expect it to show 'Main: 2' or similar if it worked like the first picker.
-    // The prompt says "it change in list but not on the main screen".
-    // So let's assert that the text changes to "Parent: 2" (we will implement this).
-    expect(find.text('Parent: 2'), findsOneWidget);
+    // Verify selection updated (Chip)
+    expect(find.text('Main 2'), findsOneWidget);
   });
 }

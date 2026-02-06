@@ -200,8 +200,15 @@ class _DemoHomeState extends State<DemoHome> {
               '- Selecting items in main list A toggles chips on screen',
             ),
             const SizedBox(height: 8),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _SelectedChips(
+                  title: 'Selected on screen A',
+                  ids: selectedOnScreenA,
+                  universe: universe,
+                ),
+                const SizedBox(height: 12),
                 _CircleIconTrigger(
                   child: SearchAnchorPicker<DemoItem>(
                     config: mainAConfig,
@@ -309,14 +316,6 @@ class _DemoHomeState extends State<DemoHome> {
                     minWidth: 520,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SelectedChips(
-                    title: 'Selected on screen A',
-                    ids: selectedOnScreenA,
-                    universe: universe,
-                  ),
-                ),
               ],
             ),
 
@@ -331,8 +330,15 @@ class _DemoHomeState extends State<DemoHome> {
             ),
             const SizedBox(height: 8),
 
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _SelectedChips(
+                  title: 'Selected on screen B',
+                  ids: selectedOnScreenB,
+                  universe: universe,
+                ),
+                const SizedBox(height: 12),
                 _CircleIconTrigger(
                   child: SearchAnchorPicker<DemoItem>(
                     config: mainBConfig,
@@ -418,14 +424,6 @@ class _DemoHomeState extends State<DemoHome> {
                     minWidth: 520,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SelectedChips(
-                    title: 'Selected on screen B',
-                    ids: selectedOnScreenB,
-                    universe: universe,
-                  ),
-                ),
               ],
             ),
 
@@ -440,8 +438,45 @@ class _DemoHomeState extends State<DemoHome> {
             ),
             const SizedBox(height: 8),
 
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Selected radio item',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        if (selectedRadioId == null)
+                          const Text('No selection')
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Chip(
+                                label: Text(
+                                  universe[selectedRadioId!]?.label ??
+                                      '#$selectedRadioId',
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    setState(() => selectedRadioId = null),
+                                child: const Text('Clear'),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _CircleIconTrigger(
                   child: SearchAnchorPicker<DemoItem>(
                     config: configForRepo(listA, title: 'Radio picker demo'),
@@ -478,46 +513,9 @@ class _DemoHomeState extends State<DemoHome> {
                     minWidth: 520,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Selected radio item',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          if (selectedRadioId == null)
-                            const Text('No selection')
-                          else
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                Chip(
-                                  label: Text(
-                                    universe[selectedRadioId!]?.label ??
-                                        '#$selectedRadioId',
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      setState(() => selectedRadioId = null),
-                                  child: const Text('Clear'),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
+            SizedBox.square(dimension: 600,)
           ],
         ),
       ),
