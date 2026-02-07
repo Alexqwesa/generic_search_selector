@@ -37,6 +37,8 @@ Configuration object.
 
 ### `GenericPickerActions<T, K>`
 Actions interface exposed to `headerBuilder`. Use this to interact with the picker state *without* `setState`.
+> **Scheduler Safety**: All methods (`setPending`, `close`, `refresh`) are wrapped in `addPostFrameCallback`, making them safe to call directly from build methods or synchronous callbacks.
+
 - **`pending`**: `Set<K>` - Getter for the current in-overlay selection.
 - **`setPending(Set<K> ids)`**: Overwrite the entire selection.
 - **`toggleId(K id, bool next)`**: Toggle a single ID on or off.

@@ -251,22 +251,27 @@ class GenericPickerActions<T, K> {
   GenericPickerActions({
     required this.pendingN,
     required this.idOf,
-    required this.close,
+    required void Function([String? reason]) close,
     required this.mode,
     required this.getKey,
-    required this.refresh,
-  });
+    required VoidCallback refresh,
+  }) : _close = close,
+       _refresh = refresh;
 
   final ValueNotifier<Set<K>> pendingN;
   final K Function(T) idOf;
-  final void Function([String? reason]) close;
+  final void Function([String? reason]) _close;
   final GlobalKey Function(Object id) getKey;
-  final VoidCallback refresh;
+  final VoidCallback _refresh;
   final PickerMode mode;
 
   Set<K> get pending => pendingN.value;
 
-  void setPending(Set<K> ids) => pendingN.value = ids;
+  void setPending(Set<K> ids) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      pendingN.value = ids;
+    });
+  }
 
   void selectAll(Iterable<K> ids) => setPending(ids.toSet());
 
@@ -276,6 +281,18 @@ class GenericPickerActions<T, K> {
     final s = {...pending};
     next ? s.add(id) : s.remove(id);
     setPending(s);
+  }
+
+  void refresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refresh();
+    });
+  }
+
+  void close([String? reason]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _close(reason);
+    });
   }
 }
 
