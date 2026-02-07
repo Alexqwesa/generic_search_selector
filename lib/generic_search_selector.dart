@@ -5,3 +5,4 @@ export 'src/search_anchor_picker.dart';
 export 'src/overlay_body.dart';
 export 'src/overflow_tooltip_text.dart';
 export 'src/sub_picker_tile.dart';
+export 'src/picker_debug.dart';

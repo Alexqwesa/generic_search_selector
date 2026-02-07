@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:generic_search_selector/src/picker_debug.dart';
 import 'package:generic_search_selector/src/overlay_body.dart';
 import 'package:generic_search_selector/src/picker_config.dart';
 
@@ -261,11 +262,15 @@ class _GenericSearchAnchorPickerState<T, K>
   }
 
   void _requestOpen() {
+    PickerDebug.log('SearchAnchorPicker: Opening picker');
     _onOpen();
     _ctrl.openView();
   }
 
   void _close([String? reasonIgnored, bool skipCloseView = false]) {
+    PickerDebug.log(
+      'SearchAnchorPicker: Closing picker. Reason=$reasonIgnored, skipCloseView=$skipCloseView',
+    );
     final queryAtClose = _ctrl.text;
 
     // IMPORTANT: do not pass reason -> it can affect controller text next open.

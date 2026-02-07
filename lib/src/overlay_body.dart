@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/src/overflow_tooltip_text.dart';
+import 'package:generic_search_selector/src/picker_debug.dart';
 import 'package:generic_search_selector/src/picker_config.dart';
 
 class OverlayBody<T, K> extends StatefulWidget {
@@ -126,6 +127,9 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                   );
 
                             Future<void> toggle(bool next) async {
+                              PickerDebug.log(
+                                'OverlayBody: User toggle item=$item, next=$next',
+                              );
                               if (widget.onToggleGate != null) {
                                 final ok = await widget.onToggleGate!(
                                   item,
