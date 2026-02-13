@@ -1,4 +1,4 @@
-import 'package:example_of_generic_search_selector/main_radio.dart';
+import '../example/example_of_generic_search_selector/lib/main_radio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -59,7 +59,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify sub selection updated on main screen (Chip)
-    expect(find.text('Sub 1'), findsNWidgets(2));  // seems to work maybe it found both on main screen and on list?
+    expect(
+      find.text('Sub 1'),
+      findsNWidgets(2),
+    ); // seems to work maybe it found both on main screen and on list?
 
     // Also check title
     expect(find.text('Selected Parent/Sub Item'), findsOneWidget);

@@ -1,4 +1,4 @@
-import 'package:example_of_generic_search_selector/main.dart'; // for DemoItem
+import '../example/example_of_generic_search_selector/lib/main.dart'; // for DemoItem
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:generic_search_selector/generic_search_selector.dart';

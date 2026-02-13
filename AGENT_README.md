@@ -14,6 +14,10 @@ The main widget that opens a search view.
 - **`onFinish`**: `Future<void> Function(List<K> ids, {required List<K> added, required List<K> removed})` - Called when the picker closes.
 - **`itemBuilder`**: `Widget Function(BuildContext, T item, bool selected, VoidCallback toggle)` - (Optional) Custom renderer.
 - **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
+- **`triggerBuilder`**: `Widget Function(BuildContext, VoidCallback open, int version)?` - (Optional) Builder for the
+  button that opens the picker. Note the `int version` parameter: it increments every time the picker closes, allowing
+  you to force a rebuild(via ValueKey(version) if needed.)
+- **`triggerChild`**: `Widget?` - (Optional) Alternative to `triggerBuilder`. A static child that, when tapped, opens the picker.
 
 > **Note**: `SearchAnchorPicker<T>` is a convenient subclass fixed to `K=int`.
 

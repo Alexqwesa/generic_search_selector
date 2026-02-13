@@ -1,4 +1,4 @@
-import 'package:example_of_generic_search_selector/main.dart';
+import '../example/example_of_generic_search_selector/lib/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -59,7 +59,6 @@ void main() {
     }
     await tester.pumpAndSettle();
 
-
     // Let's verify Charlie is now in List A.
     expect(find.text('A1: Charlie (external)'), findsOneWidget);
 
@@ -70,9 +69,6 @@ void main() {
     // Verify chip
     expect(find.widgetWithText(Chip, 'A1: Charlie (external)'), findsOneWidget);
   });
-
-
-
 
   testWidgets('Icon #2 (Main List B) Selection', (WidgetTester tester) async {
     await tester.pumpWidget(const DemoApp());
