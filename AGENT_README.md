@@ -9,6 +9,11 @@ The main widget that opens a search view.
 - **Generic `<T>`**: item type.
 - **Generic `<K>`**: ID type (e.g. `int`, `String`, `UUID`).
 - **`config`**: `GenericPickerConfig<T, K>`.
+- **`initialSelectedIds`**: `List<K>` - The initially selected items.
+- **`onToggle`**: `Future<bool> Function(T item, bool next)` - Intercepts selection events. Return `true` to allow change.
+- **`onFinish`**: `Future<void> Function(List<K> ids, {required List<K> added, required List<K> removed})` - Called when the picker closes.
+- **`itemBuilder`**: `Widget Function(BuildContext, T item, bool selected, VoidCallback toggle)` - (Optional) Custom renderer.
+- **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
 
 > **Note**: `SearchAnchorPicker<T>` is a convenient subclass fixed to `K=int`.
 
@@ -16,9 +21,6 @@ The main widget that opens a search view.
 Configuration object.
 - **`loadItems`**: `Future<List<T>> Function(BuildContext)` - Loads the list of selectable items.
 - **`idOf`**: `K Function(T)` - Returns unique ID (of type `K`).
-- **`onToggle`**: `Future<bool> Function(T item, bool next)` - Intercepts selection events. Return `true` to allow change.
-- **`itemBuilder`**: `Widget Function(BuildContext, T item, bool selected, VoidCallback toggle)` - (Optional) Custom renderer.
-- **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
 - **`labelOf`**: `String Function(T)` - Display label.
 - **`searchTermsOf`**: `Iterable<String> Function(T)` - Keywords for local search filtering.
 - **`iconOf`**: `Widget Function(T)?` - Optional icon for the list tile.
@@ -75,7 +77,8 @@ SearchAnchorPicker<MyItem>(
     labelOf: (item) => item.name,
     searchTermsOf: (item) => [item.name, item.email],
   ),
-  onChanged: (ids) => print('Selected: $ids'),
+  initialSelectedIds: [],
+  onFinish: (ids, {required added, required removed}) async => print('Selected: $ids'),
   triggerBuilder: (context, open, _) => 
       IconButton(icon: Icon(Icons.add), onPressed: open),
 )
