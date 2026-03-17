@@ -489,24 +489,43 @@ class _GenericSearchAnchorPickerState<T, K>
   }
 
   Widget _buildSearchField() {
-    return ListenableBuilder(
-      listenable: _ctrl,
-      builder: (context, _) {
-        return TextField(
-          controller: _ctrl,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: widget.config.title ?? 'Search',
-            border: InputBorder.none,
-            isDense: true,
-            suffixIcon: _ctrl.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Clear',
-                    icon: const Icon(Icons.clear),
-                    onPressed: () => _ctrl.clear(),
-                  ),
-          ),
+    return Builder(
+      builder: (context) {
+        final l10n = MaterialLocalizations.of(context);
+
+        return ListenableBuilder(
+          listenable: _ctrl,
+          builder: (context, _) {
+            return SearchBar(
+              controller: _ctrl,
+              autoFocus: true,
+              hintText: widget.config.title ?? l10n.searchFieldLabel,
+              leading: IconButton(
+                tooltip: l10n.backButtonTooltip,
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _close,
+              ),
+              trailing: _ctrl.text.isEmpty
+                  ? null
+                  : [
+                      IconButton(
+                        tooltip: l10n.clearButtonTooltip,
+                        icon: const Icon(Icons.close),
+                        onPressed: () => _ctrl.clear(),
+                      ),
+                    ],
+              elevation: const WidgetStatePropertyAll<double>(0),
+              backgroundColor: const WidgetStatePropertyAll<Color>(
+                Colors.transparent,
+              ),
+              overlayColor: const WidgetStatePropertyAll<Color>(
+                Colors.transparent,
+              ),
+              side: const WidgetStatePropertyAll<BorderSide>(
+                BorderSide(color: Colors.transparent),
+              ),
+            );
+          },
         );
       },
     );
@@ -529,16 +548,7 @@ class _GenericSearchAnchorPickerState<T, K>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                IconButton(
-                  tooltip: 'Back',
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: _close,
-                ),
-                Expanded(child: _buildSearchField()),
-              ],
-            ),
+            _buildSearchField(),
             const Divider(height: 1),
             Flexible(child: _buildOverlayView()),
           ],
