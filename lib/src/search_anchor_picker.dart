@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' show clampDouble;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:generic_search_selector/src/picker_debug.dart';
 import 'package:generic_search_selector/src/overlay_body.dart';
 import 'package:generic_search_selector/src/picker_config.dart';
@@ -500,7 +501,8 @@ class _GenericSearchAnchorPickerState<T, K>
             return SearchBar(
               controller: _ctrl,
               autoFocus: true,
-              hintText: widget.config.title ?? l10n.searchFieldLabel,
+              hintText:
+                  l10n.searchFieldLabel + " - " + (widget.config.title ?? ''),
               leading: IconButton(
                 tooltip: l10n.backButtonTooltip,
                 icon: const Icon(Icons.arrow_back),
@@ -639,34 +641,45 @@ class _GenericSearchAnchorPickerState<T, K>
           screenSize: screenSize,
         );
 
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                ignoring: !(ModalRoute.of(context)?.isCurrent ?? true),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _close,
-                  child: const SizedBox.expand(),
+        return FocusScope(
+          autofocus: true,
+          onKeyEvent: (_, event) {
+            if (event is KeyDownEvent &&
+                event.logicalKey == LogicalKeyboardKey.escape) {
+              _close('escape');
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  ignoring: !(ModalRoute.of(context)?.isCurrent ?? true),
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: _close,
+                    child: const SizedBox.expand(),
+                  ),
                 ),
               ),
-            ),
-            TweenAnimationBuilder<Offset>(
-              tween: Tween<Offset>(begin: Offset.zero, end: resolvedOffset),
-              duration: widget.menuOffsetAnimationDuration,
-              builder: (context, offset, _) {
-                return Positioned(
-                  left: baseRect.left + offset.dx,
-                  top: baseRect.top + offset.dy,
-                  child: _buildPopupSurface(
-                    width: baseRect.width,
-                    maxHeight: baseRect.height,
-                  ),
-                );
-              },
-            ),
-          ],
+              TweenAnimationBuilder<Offset>(
+                tween: Tween<Offset>(begin: Offset.zero, end: resolvedOffset),
+                duration: widget.menuOffsetAnimationDuration,
+                builder: (context, offset, _) {
+                  return Positioned(
+                    left: baseRect.left + offset.dx,
+                    top: baseRect.top + offset.dy,
+                    child: _buildPopupSurface(
+                      width: baseRect.width,
+                      maxHeight: baseRect.height,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         );
       },
     );

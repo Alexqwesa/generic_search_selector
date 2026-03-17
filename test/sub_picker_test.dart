@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:generic_search_selector/generic_search_selector.dart';
 
@@ -343,6 +344,59 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Escape closes only the topmost open menu', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig(
+              loadItems: (_) async => [1, 2],
+              idOf: (i) => i,
+              labelOf: (i) => 'Parent $i',
+              searchTermsOf: (i) => ['Parent $i'],
+            ),
+            initialSelectedIds: const [],
+            triggerBuilder: (_, open, __) => ElevatedButton(
+              onPressed: open,
+              child: const Text('Open Parent'),
+            ),
+            headerBuilder: (context, actions, allItems) => [
+              SubPickerTile<int>(
+                title: 'Open Child',
+                config: PickerConfig(
+                  loadItems: (_) async => [10, 20],
+                  idOf: (i) => i,
+                  labelOf: (i) => 'Child $i',
+                  searchTermsOf: (i) => ['Child $i'],
+                ),
+                initialSelectedIds: const [],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open Parent'));
+    await tester.pumpAndSettle();
+    expect(find.text('Parent 1'), findsOneWidget);
+
+    await tester.tap(find.text('Open Child'));
+    await tester.pumpAndSettle();
+    expect(find.text('Child 10'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Child 10'), findsNothing);
+    expect(find.text('Parent 1'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Parent 1'), findsNothing);
   });
 
   testWidgets(
