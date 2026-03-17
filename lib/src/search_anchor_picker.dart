@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show clampDouble;
+import 'dart:ui' show clampDouble, lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -135,9 +135,15 @@ class SearchAnchorPicker<T> extends GenericSearchAnchorPicker<T, int> {
   });
 }
 
+const Duration _kOpenViewDuration = Duration(milliseconds: 600);
+const Curve _kOpenViewCurve = Curves.easeInOutCubicEmphasized;
+const Curve _kViewFadeOnInterval = Interval(0.0, 0.5);
+
 class _GenericSearchAnchorPickerState<T, K>
-    extends State<GenericSearchAnchorPicker<T, K>> {
+    extends State<GenericSearchAnchorPicker<T, K>>
+    with SingleTickerProviderStateMixin {
   late final SearchController _owned = SearchController();
+  late final AnimationController _openController;
   OverlayEntry? _overlayEntry;
   OverlayState? _overlayState;
   Rect _openedAnchorRect = Rect.zero;
@@ -165,6 +171,10 @@ class _GenericSearchAnchorPickerState<T, K>
   @override
   void initState() {
     super.initState();
+    _openController = AnimationController(
+      vsync: this,
+      duration: _kOpenViewDuration,
+    )..addListener(() => _overlayEntry?.markNeedsBuild());
     _attachListenable(widget.config.listenable);
     _bindConfigControl();
   }
@@ -246,6 +256,7 @@ class _GenericSearchAnchorPickerState<T, K>
     _unbindConfigControl(widget.config);
     _detachListenable(widget.config.listenable);
     _pendingN.dispose();
+    _openController.dispose();
     if (widget.searchController == null) {
       _owned.dispose();
     }
@@ -299,6 +310,7 @@ class _GenericSearchAnchorPickerState<T, K>
     );
     final queryAtClose = _ctrl.text;
 
+    FocusManager.instance.primaryFocus?.unfocus();
     _removeOverlay();
 
     // Apply query behavior on next frame (avoid build-scope issues).
@@ -343,12 +355,15 @@ class _GenericSearchAnchorPickerState<T, K>
     _overlayState = overlay;
     _openedAnchorSize = _anchorSize();
     _openedAnchorRect = _currentAnchorRect();
+    _openController.value = 0;
     _overlayEntry?.remove();
     _overlayEntry = OverlayEntry(builder: (context) => _buildOverlayEntry());
     overlay.insert(_overlayEntry!);
+    unawaited(_openController.forward());
   }
 
   void _removeOverlay() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _overlayEntry?.remove();
     _overlayEntry = null;
     _overlayState = null;
@@ -640,6 +655,55 @@ class _GenericSearchAnchorPickerState<T, K>
           baseRect: baseRect,
           screenSize: screenSize,
         );
+        final openAnimation = CurvedAnimation(
+          parent: _openController,
+          curve: _kOpenViewCurve,
+        );
+        final fadeAnimation = CurvedAnimation(
+          parent: _openController,
+          curve: _kViewFadeOnInterval,
+        );
+        final offsetDuration =
+            widget.menuOffsetAnimationDuration.inMicroseconds <= 0
+            ? 1.0
+            : (widget.menuOffsetAnimationDuration.inMicroseconds /
+                      _kOpenViewDuration.inMicroseconds)
+                  .clamp(0.0, 1.0);
+        final offsetAnimation = CurvedAnimation(
+          parent: _openController,
+          curve: Interval(0.0, offsetDuration, curve: Curves.easeOutCubic),
+        );
+        final animatedLeft = lerpDouble(
+          _openedAnchorRect.left,
+          baseRect.left,
+          openAnimation.value,
+        )!;
+        final animatedTop = lerpDouble(
+          _openedAnchorRect.top,
+          baseRect.top,
+          openAnimation.value,
+        )!;
+        final animatedOffset =
+            Offset.lerp(Offset.zero, resolvedOffset, offsetAnimation.value) ??
+            resolvedOffset;
+        final widthScale = (_openedAnchorRect.width / baseRect.width).clamp(
+          0.92,
+          1.0,
+        );
+        final heightScale = (_openedAnchorRect.height / baseRect.height).clamp(
+          0.92,
+          1.0,
+        );
+        final animatedScaleX = lerpDouble(
+          widthScale,
+          1.0,
+          openAnimation.value,
+        )!;
+        final animatedScaleY = lerpDouble(
+          heightScale,
+          1.0,
+          openAnimation.value,
+        )!;
 
         return FocusScope(
           autofocus: true,
@@ -665,15 +729,23 @@ class _GenericSearchAnchorPickerState<T, K>
                 ),
               ),
               TweenAnimationBuilder<Offset>(
-                tween: Tween<Offset>(begin: Offset.zero, end: resolvedOffset),
-                duration: widget.menuOffsetAnimationDuration,
-                builder: (context, offset, _) {
+                tween: Tween<Offset>(begin: Offset.zero, end: Offset.zero),
+                duration: Duration.zero,
+                builder: (context, _, __) {
                   return Positioned(
-                    left: baseRect.left + offset.dx,
-                    top: baseRect.top + offset.dy,
-                    child: _buildPopupSurface(
-                      width: baseRect.width,
-                      maxHeight: baseRect.height,
+                    left: animatedLeft + animatedOffset.dx,
+                    top: animatedTop + animatedOffset.dy,
+                    child: Opacity(
+                      opacity: fadeAnimation.value,
+                      child: Transform.scale(
+                        alignment: Alignment.topLeft,
+                        scaleX: animatedScaleX,
+                        scaleY: animatedScaleY,
+                        child: _buildPopupSurface(
+                          width: baseRect.width,
+                          maxHeight: baseRect.height,
+                        ),
+                      ),
                     ),
                   );
                 },

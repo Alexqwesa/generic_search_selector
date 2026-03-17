@@ -399,6 +399,41 @@ void main() {
     expect(find.text('Parent 1'), findsNothing);
   });
 
+  testWidgets('popup opening animation stays stable before settle', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 56,
+            height: 40,
+            child: SearchAnchorPicker<int>(
+              minWidth: 320,
+              config: PickerConfig(
+                loadItems: (_) async => [1, 2],
+                idOf: (i) => i,
+                labelOf: (i) => 'Item $i',
+                searchTermsOf: (i) => ['Item $i'],
+              ),
+              initialSelectedIds: const [],
+              triggerBuilder: (_, open, __) =>
+                  ElevatedButton(onPressed: open, child: const Text('Open')),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pump();
+    expect(find.byType(SearchBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchBar), findsOneWidget);
+  });
+
   testWidgets(
     'SearchAnchorPicker matches SearchAnchor popup placement before offset',
     (tester) async {
