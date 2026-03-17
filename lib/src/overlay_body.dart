@@ -1,8 +1,81 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/src/overflow_tooltip_text.dart';
 import 'package:generic_search_selector/src/picker_debug.dart';
 import 'package:generic_search_selector/src/picker_config.dart';
+
+Future<bool?> _showOverlayAlert(
+  BuildContext context, {
+  required String title,
+  required String content,
+}) {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  if (overlay == null) return Future.value(null);
+
+  final completer = Completer<bool?>();
+  late final OverlayEntry entry;
+
+  void close([bool? result]) {
+    if (completer.isCompleted) return;
+    entry.remove();
+    completer.complete(result);
+  }
+
+  entry = OverlayEntry(
+    builder: (context) => Material(
+      color: Colors.black54,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Material(
+            clipBehavior: Clip.antiAlias,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  Text(content),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => close(false),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => close(true),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Text('Remove'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  overlay.insert(entry);
+  return completer.future;
+}
 
 class OverlayBody<T, K> extends StatefulWidget {
   const OverlayBody({
@@ -173,26 +246,11 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                     );
                                     return;
                                   case UnselectBehavior.alert:
-                                    final confirm = await showDialog<bool>(
-                                      context: context,
-                                      builder: (ctx) => AlertDialog(
-                                        title: const Text('Remove item?'),
-                                        content: Text(
+                                    final confirm = await _showOverlayAlert(
+                                      context,
+                                      title: 'Remove item?',
+                                      content:
                                           '${widget.config.labelOf(item)} is currently in use. Removing it might affect other data.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(ctx, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(ctx, true),
-                                            child: const Text('Remove'),
-                                          ),
-                                        ],
-                                      ),
                                     );
                                     if (confirm != true) return;
                                     break;

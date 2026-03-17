@@ -21,6 +21,8 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
     this.trailing,
     this.triggerBuilder,
     this.itemBuilder,
+    this.menuOffset = const Offset(30,30),
+    this.menuOffsetAnimationDuration = const Duration(milliseconds: 120),
   }) : assert(title != null || triggerBuilder != null);
 
   /// Title shown on the tile.
@@ -67,6 +69,9 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
   )?
   itemBuilder;
 
+  final Offset menuOffset;
+  final Duration menuOffsetAnimationDuration;
+
   @override
   Widget build(BuildContext context) {
     return GenericSearchAnchorPicker<T, K>(
@@ -87,6 +92,8 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
       },
       mode: mode,
       itemBuilder: itemBuilder,
+      menuOffset: menuOffset,
+      menuOffsetAnimationDuration: menuOffsetAnimationDuration,
       triggerBuilder: (context, open, tick) {
         if (triggerBuilder != null) {
           return triggerBuilder!(context, open, tick);
@@ -122,5 +129,7 @@ class SubPickerTile<T> extends GenericSubPickerTile<T, int> {
     super.trailing,
     super.triggerBuilder,
     super.itemBuilder,
+    super.menuOffset,
+    super.menuOffsetAnimationDuration,
   });
 }

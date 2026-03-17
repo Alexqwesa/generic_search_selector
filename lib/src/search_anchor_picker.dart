@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/src/picker_debug.dart';
@@ -34,6 +35,8 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
     this.selectedFirst,
     this.closeQueryBehavior = CloseQueryBehavior.keep,
     this.itemBuilder,
+    this.menuOffset = Offset.zero,
+    this.menuOffsetAnimationDuration = const Duration(milliseconds: 120),
   });
 
   final GenericPickerConfig<T, K> config;
@@ -90,6 +93,15 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
   )?
   itemBuilder;
 
+  /// Offset applied to the popup menu after it opens.
+  ///
+  /// The menu is shown at its default position and then quickly animates to
+  /// this translation, which is useful for nested menus that need slightly
+  /// different coordinates.
+  final Offset menuOffset;
+
+  final Duration menuOffsetAnimationDuration;
+
   @override
   State<GenericSearchAnchorPicker<T, K>> createState() =>
       _GenericSearchAnchorPickerState<T, K>();
@@ -116,12 +128,19 @@ class SearchAnchorPicker<T> extends GenericSearchAnchorPicker<T, int> {
     super.selectedFirst,
     super.closeQueryBehavior,
     super.itemBuilder,
+    super.menuOffset,
+    super.menuOffsetAnimationDuration,
   });
 }
 
 class _GenericSearchAnchorPickerState<T, K>
     extends State<GenericSearchAnchorPicker<T, K>> {
   late final SearchController _owned = SearchController();
+  final GlobalKey _anchorKey = GlobalKey();
+  OverlayEntry? _overlayEntry;
+  OverlayState? _overlayState;
+  Rect _openedAnchorRect = Rect.zero;
+  Size _openedAnchorSize = Size.zero;
 
   SearchController get _ctrl => widget.searchController ?? _owned;
 
@@ -221,9 +240,13 @@ class _GenericSearchAnchorPickerState<T, K>
 
   @override
   void dispose() {
+    _removeOverlay();
     _unbindConfigControl(widget.config);
     _detachListenable(widget.config.listenable);
     _pendingN.dispose();
+    if (widget.searchController == null) {
+      _owned.dispose();
+    }
     // if (!_open) _viewTickN.dispose();
     // Same fix as controller: avoid disposing if view is animating out.
     // _viewTickN.dispose();
@@ -263,8 +286,9 @@ class _GenericSearchAnchorPickerState<T, K>
 
   void _requestOpen() {
     PickerDebug.log('SearchAnchorPicker: Opening picker');
+    if (_open) return;
     _onOpen();
-    _ctrl.openView();
+    _showOverlay();
   }
 
   void _close([String? reasonIgnored, bool skipCloseView = false]) {
@@ -273,10 +297,7 @@ class _GenericSearchAnchorPickerState<T, K>
     );
     final queryAtClose = _ctrl.text;
 
-    // IMPORTANT: do not pass reason -> it can affect controller text next open.
-    if (!skipCloseView) {
-      _ctrl.closeView('');
-    }
+    _removeOverlay();
 
     // Apply query behavior on next frame (avoid build-scope issues).
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -312,6 +333,49 @@ class _GenericSearchAnchorPickerState<T, K>
       _viewTickN.value++;
       setState(() => _tick++);
     });
+  }
+
+  void _showOverlay() {
+    final overlay = Overlay.of(context);
+    if (overlay == null) return;
+    _overlayState = overlay;
+    _openedAnchorSize = _anchorSize();
+    _openedAnchorRect = _currentAnchorRect();
+    _overlayEntry?.remove();
+    _overlayEntry = OverlayEntry(builder: (context) => _buildOverlayEntry());
+    overlay.insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    _overlayState = null;
+  }
+
+  Size _anchorSize() {
+    final anchorContext = _anchorKey.currentContext;
+    if (anchorContext == null) {
+      return Size(widget.minWidth, 0);
+    }
+    final renderBox = anchorContext.findRenderObject() as RenderBox?;
+    return renderBox?.size ?? Size(widget.minWidth, 0);
+  }
+
+  Rect _currentAnchorRect() {
+    final anchorContext = _anchorKey.currentContext;
+    if (anchorContext == null) {
+      return Offset.zero & Size(widget.minWidth, 0);
+    }
+
+    final anchorBox = anchorContext.findRenderObject() as RenderBox?;
+    final overlayBox = _overlayState?.context.findRenderObject() as RenderBox?;
+
+    if (anchorBox == null || overlayBox == null) {
+      return Offset.zero & Size(widget.minWidth, 0);
+    }
+
+    final offset = anchorBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    return offset & anchorBox.size;
   }
 
   void _computeStableIds(List<T> items) {
@@ -371,93 +435,199 @@ class _GenericSearchAnchorPickerState<T, K>
     if (_stableIds.isEmpty) _computeStableIds(items);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final hasSelection = widget.initialSelectedIds.isNotEmpty;
-
-    return SearchAnchor(
-      searchController: _ctrl,
-      isFullScreen: false,
-      viewConstraints: BoxConstraints(
-        maxHeight: widget.maxHeight,
-        minWidth: widget.minWidth,
-      ),
-      suggestionsBuilder: (_, __) => const <Widget>[],
-      builder: (context, controller) {
-        if (widget.triggerBuilder != null) {
-          return widget.triggerBuilder!(context, _requestOpen, _tick);
-        }
-
-        if (widget.triggerChild != null) {
-          return GestureDetector(
-            onTap: _requestOpen,
-            child: widget.triggerChild,
+  Widget _buildOverlayView() {
+    return ValueListenableBuilder<int>(
+      valueListenable: _viewTickN,
+      builder: (context, tick, _) {
+        final items = _itemsSnapshot;
+        if (items == null) {
+          return const SizedBox(
+            height: 140,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
 
-        return IconButton(
-          iconSize: widget.iconSize,
-          tooltip: widget.config.title,
-          icon: hasSelection ? widget.iconWhenSelected : widget.iconWhenEmpty,
-          onPressed: _requestOpen,
+        if (_stableIds.isEmpty) {
+          _computeStableIds(items);
+        } else {
+          _syncStableIds(items);
+        }
+
+        final actions = GenericPickerActions<T, K>(
+          pendingN: _pendingN,
+          idOf: widget.config.idOf,
+          close: _close,
+          mode: widget.mode,
+          getKey: _getKey,
+          refresh: _reload,
+        );
+
+        final header = widget.headerBuilder != null
+            ? widget.headerBuilder!(context, actions, items)
+            : (widget.headerTiles ?? const <Widget>[]);
+
+        final byId = <K, T>{for (final it in items) widget.config.idOf(it): it};
+        final stableOrder = <T>[
+          for (final id in _stableIds)
+            if (byId.containsKey(id)) byId[id]!,
+        ];
+
+        return OverlayBody<T, K>(
+          header: header,
+          items: items,
+          stableOrder: stableOrder.isEmpty ? items : stableOrder,
+          ctrl: _ctrl,
+          pendingN: _pendingN,
+          mode: widget.mode,
+          config: widget.config,
+          onToggleGate: widget.onToggle,
+          close: _close,
+          itemBuilder: widget.itemBuilder,
         );
       },
-      viewBuilder: (suggestions) {
-        return ValueListenableBuilder<int>(
-          valueListenable: _viewTickN,
-          builder: (context, tick, _) {
-            final items = _itemsSnapshot;
-            if (items == null) {
-              return const SizedBox(
-                height: 140,
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-              );
-            }
+    );
+  }
 
-            if (_stableIds.isEmpty) {
-              _computeStableIds(items);
-            } else {
-              _syncStableIds(items);
-            }
+  Widget _buildSearchField() {
+    return Builder(
+      builder: (context) {
+        final l10n = MaterialLocalizations.of(context);
 
-            final actions = GenericPickerActions<T, K>(
-              pendingN: _pendingN,
-              idOf: widget.config.idOf,
-              close: _close,
-              mode: widget.mode,
-              getKey: _getKey,
-              refresh: _reload,
-            );
-
-            final header = widget.headerBuilder != null
-                ? widget.headerBuilder!(context, actions, items)
-                : (widget.headerTiles ?? const <Widget>[]);
-
-            // Resolve stable order into actual items list.
-            final byId = <K, T>{
-              for (final it in items) widget.config.idOf(it): it,
-            };
-            final stableOrder = <T>[
-              for (final id in _stableIds)
-                if (byId.containsKey(id)) byId[id]!,
-            ];
-
-            return OverlayBody<T, K>(
-              header: header,
-              items: items,
-              stableOrder: stableOrder.isEmpty ? items : stableOrder,
-              ctrl: _ctrl,
-              pendingN: _pendingN,
-              mode: widget.mode,
-              config: widget.config,
-              onToggleGate: widget.onToggle,
-              close: _close,
-              itemBuilder: widget.itemBuilder,
+        return ListenableBuilder(
+          listenable: _ctrl,
+          builder: (context, _) {
+            return SearchBar(
+              controller: _ctrl,
+              autoFocus: true,
+              hintText: widget.config.title ?? l10n.searchFieldLabel,
+              leading: IconButton(
+                tooltip: l10n.backButtonTooltip,
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _close,
+              ),
+              trailing: _ctrl.text.isEmpty
+                  ? null
+                  : [
+                      IconButton(
+                        tooltip: l10n.clearButtonTooltip,
+                        icon: const Icon(Icons.close),
+                        onPressed: () => _ctrl.clear(),
+                      ),
+                    ],
+              elevation: const WidgetStatePropertyAll<double>(0),
+              backgroundColor: const WidgetStatePropertyAll<Color>(
+                Colors.transparent,
+              ),
+              overlayColor: const WidgetStatePropertyAll<Color>(
+                Colors.transparent,
+              ),
+              side: const WidgetStatePropertyAll<BorderSide>(
+                BorderSide(color: Colors.transparent),
+              ),
             );
           },
         );
       },
     );
+  }
+
+  Widget _buildPopupSurface(double maxHeight) {
+    final width = math.max(widget.minWidth, _openedAnchorSize.width);
+
+    return Material(
+      clipBehavior: Clip.antiAlias,
+      elevation: 6,
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minWidth: width,
+          maxWidth: width,
+          maxHeight: maxHeight,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildSearchField(),
+            const Divider(height: 1),
+            Flexible(child: _buildOverlayView()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverlayEntry() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenSize = constraints.biggest;
+        final anchorRect = _openedAnchorRect;
+        final popupHeight = math.min(widget.maxHeight, screenSize.height);
+
+        double dx = widget.menuOffset.dx;
+        double dy = widget.menuOffset.dy;
+
+        final bottom = anchorRect.top + dy + popupHeight;
+        if (bottom > screenSize.height) {
+          dy -= bottom - screenSize.height;
+        }
+
+        final top = anchorRect.top + dy;
+        if (top < 0) {
+          dy -= top;
+        }
+
+        final availableHeight = math.max(
+          140.0,
+          screenSize.height - math.max(anchorRect.top + dy, 0),
+        );
+        final resolvedMaxHeight = math.min(widget.maxHeight, availableHeight);
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !(ModalRoute.of(context)?.isCurrent ?? true),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _close,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+            TweenAnimationBuilder<Offset>(
+              tween: Tween<Offset>(begin: Offset.zero, end: Offset(dx, dy)),
+              duration: widget.menuOffsetAnimationDuration,
+              builder: (context, offset, _) {
+                return Positioned(
+                  left: anchorRect.left + offset.dx,
+                  top: anchorRect.top + offset.dy,
+                  child: _buildPopupSurface(resolvedMaxHeight),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSelection = widget.initialSelectedIds.isNotEmpty;
+    final trigger = widget.triggerBuilder != null
+        ? widget.triggerBuilder!(context, _requestOpen, _tick)
+        : widget.triggerChild != null
+        ? GestureDetector(onTap: _requestOpen, child: widget.triggerChild)
+        : IconButton(
+            iconSize: widget.iconSize,
+            tooltip: widget.config.title,
+            icon: hasSelection ? widget.iconWhenSelected : widget.iconWhenEmpty,
+            onPressed: _requestOpen,
+          );
+
+    return KeyedSubtree(key: _anchorKey, child: trigger);
   }
 }
 
