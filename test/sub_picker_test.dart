@@ -2,6 +2,66 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:generic_search_selector/generic_search_selector.dart';
 
+Rect _searchAnchorStyleRect({
+  required Rect anchorRect,
+  required Size screenSize,
+  required double minWidth,
+  required double maxHeight,
+  required TextDirection textDirection,
+}) {
+  final viewWidth =
+      anchorRect.width.clamp(
+            minWidth < screenSize.width ? minWidth : screenSize.width,
+            screenSize.width,
+          )
+          as double;
+  final minHeight = maxHeight < 240 ? maxHeight : 240.0;
+  final viewHeight =
+      (screenSize.height * 2 / 3).clamp(minHeight, maxHeight) as double;
+
+  switch (textDirection) {
+    case TextDirection.ltr:
+      var topLeft = anchorRect.topLeft;
+      if (screenSize.width - anchorRect.left < viewWidth) {
+        topLeft = Offset(screenSize.width - viewWidth, topLeft.dy);
+      }
+      if (screenSize.height - anchorRect.top < viewHeight) {
+        topLeft = Offset(topLeft.dx, screenSize.height - viewHeight);
+      }
+      return topLeft & Size(viewWidth, viewHeight);
+    case TextDirection.rtl:
+      var topLeft = Offset(
+        (anchorRect.right - viewWidth).clamp(0.0, double.infinity) as double,
+        anchorRect.top,
+      );
+      if (anchorRect.right < viewWidth) {
+        topLeft = Offset(0.0, topLeft.dy);
+      }
+      if (screenSize.height - anchorRect.top < viewHeight) {
+        topLeft = Offset(topLeft.dx, screenSize.height - viewHeight);
+      }
+      return topLeft & Size(viewWidth, viewHeight);
+  }
+}
+
+Offset _resolvedOffsetForTest({
+  required Rect baseRect,
+  required Size screenSize,
+  required Offset requestedOffset,
+}) {
+  final dx =
+      baseRect.left + requestedOffset.dx < 0 ||
+          baseRect.right + requestedOffset.dx > screenSize.width
+      ? 0.0
+      : requestedOffset.dx;
+  final dy =
+      baseRect.top + requestedOffset.dy < 0 ||
+          baseRect.bottom + requestedOffset.dy > screenSize.height
+      ? 0.0
+      : requestedOffset.dy;
+  return Offset(dx, dy);
+}
+
 void main() {
   testWidgets('SubPickerTile syncs removals but not additions', (tester) async {
     final parentPending = ValueNotifier<Set<int>>({1, 2, 3});
@@ -172,16 +232,19 @@ void main() {
           home: Scaffold(
             body: Align(
               alignment: Alignment.topLeft,
-              child: SubPickerTile<int>(
-                title: 'Sub Picker',
-                menuOffset: menuOffset,
-                config: PickerConfig(
-                  loadItems: (_) async => [1, 2],
-                  idOf: (i) => i,
-                  labelOf: (i) => '$i',
-                  searchTermsOf: (_) => [],
+              child: SizedBox(
+                width: 160,
+                child: SubPickerTile<int>(
+                  title: 'Sub Picker',
+                  menuOffset: menuOffset,
+                  config: PickerConfig(
+                    loadItems: (_) async => [1, 2],
+                    idOf: (i) => i,
+                    labelOf: (i) => '$i',
+                    searchTermsOf: (_) => [],
+                  ),
+                  initialSelectedIds: const [],
                 ),
-                initialSelectedIds: const [],
               ),
             ),
           ),
@@ -280,5 +343,151 @@ void main() {
       findsOneWidget,
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'SearchAnchorPicker matches SearchAnchor popup placement before offset',
+    (tester) async {
+      final triggerKey = GlobalKey();
+      const screenSize = Size(800, 600);
+      const minWidth = 320.0;
+      const maxHeight = 420.0;
+      const menuOffset = Offset(40, 12);
+
+      tester.view.physicalSize = screenSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomRight,
+              child: SizedBox(
+                key: triggerKey,
+                width: 56,
+                height: 40,
+                child: SearchAnchorPicker<int>(
+                  minWidth: minWidth,
+                  maxHeight: maxHeight,
+                  menuOffset: menuOffset,
+                  config: PickerConfig(
+                    loadItems: (_) async => [1, 2],
+                    idOf: (i) => i,
+                    labelOf: (i) => '$i',
+                    searchTermsOf: (i) => ['$i'],
+                  ),
+                  initialSelectedIds: const [],
+                  triggerBuilder: (_, open, __) => ElevatedButton(
+                    onPressed: open,
+                    child: const Text('Open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final triggerRect = tester.getRect(find.byKey(triggerKey));
+
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      final searchBarRect = tester.getRect(find.byType(SearchBar).last);
+      final expectedBaseRect = _searchAnchorStyleRect(
+        anchorRect: triggerRect,
+        screenSize: screenSize,
+        minWidth: minWidth,
+        maxHeight: maxHeight,
+        textDirection: TextDirection.ltr,
+      );
+      final expectedOffset = _resolvedOffsetForTest(
+        baseRect: expectedBaseRect,
+        screenSize: screenSize,
+        requestedOffset: menuOffset,
+      );
+
+      expect(
+        searchBarRect.left,
+        moreOrLessEquals(expectedBaseRect.left + expectedOffset.dx, epsilon: 1),
+      );
+      expect(
+        searchBarRect.top,
+        moreOrLessEquals(expectedBaseRect.top + expectedOffset.dy, epsilon: 1),
+      );
+      expect(
+        searchBarRect.width,
+        moreOrLessEquals(expectedBaseRect.width, epsilon: 1),
+      );
+    },
+  );
+
+  testWidgets('menuOffset applies only on axes with enough available space', (
+    tester,
+  ) async {
+    final triggerKey = GlobalKey();
+    const screenSize = Size(800, 600);
+    const minWidth = 320.0;
+    const maxHeight = 420.0;
+    const menuOffset = Offset(40, 12);
+
+    tester.view.physicalSize = screenSize;
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              key: triggerKey,
+              width: 56,
+              height: 40,
+              child: SearchAnchorPicker<int>(
+                minWidth: minWidth,
+                maxHeight: maxHeight,
+                menuOffset: menuOffset,
+                config: PickerConfig(
+                  loadItems: (_) async => [1, 2],
+                  idOf: (i) => i,
+                  labelOf: (i) => '$i',
+                  searchTermsOf: (i) => ['$i'],
+                ),
+                initialSelectedIds: const [],
+                triggerBuilder: (_, open, __) =>
+                    ElevatedButton(onPressed: open, child: const Text('Open')),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final triggerRect = tester.getRect(find.byKey(triggerKey));
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    final searchBarRect = tester.getRect(find.byType(SearchBar).last);
+    final expectedBaseRect = _searchAnchorStyleRect(
+      anchorRect: triggerRect,
+      screenSize: screenSize,
+      minWidth: minWidth,
+      maxHeight: maxHeight,
+      textDirection: TextDirection.ltr,
+    );
+
+    expect(
+      searchBarRect.left,
+      moreOrLessEquals(expectedBaseRect.left + menuOffset.dx, epsilon: 1),
+    );
+    expect(
+      searchBarRect.top,
+      moreOrLessEquals(expectedBaseRect.top + menuOffset.dy, epsilon: 1),
+    );
   });
 }

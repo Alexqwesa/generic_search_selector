@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show clampDouble;
 
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/src/picker_debug.dart';
@@ -531,9 +532,10 @@ class _GenericSearchAnchorPickerState<T, K>
     );
   }
 
-  Widget _buildPopupSurface(double maxHeight) {
-    final width = math.max(widget.minWidth, _openedAnchorSize.width);
-
+  Widget _buildPopupSurface({
+    required double width,
+    required double maxHeight,
+  }) {
     return Material(
       clipBehavior: Clip.antiAlias,
       elevation: 6,
@@ -557,31 +559,85 @@ class _GenericSearchAnchorPickerState<T, K>
     );
   }
 
+  Rect _basePopupRect(Size screenSize, TextDirection textDirection) {
+    final anchorRect = _openedAnchorRect;
+    final minWidth = math.min(widget.minWidth, screenSize.width);
+    final viewWidth = clampDouble(anchorRect.width, minWidth, screenSize.width);
+    final minHeight = math.min(240.0, widget.maxHeight);
+    final viewHeight = clampDouble(
+      screenSize.height * 2 / 3,
+      minHeight,
+      widget.maxHeight,
+    );
+
+    switch (textDirection) {
+      case TextDirection.ltr:
+        final viewLeftToScreenRight = screenSize.width - anchorRect.left;
+        final viewTopToScreenBottom = screenSize.height - anchorRect.top;
+
+        // Match SearchAnchor's default placement, then let menuOffset animate
+        // from that base rect.
+        var topLeft = anchorRect.topLeft;
+        if (viewLeftToScreenRight < viewWidth) {
+          topLeft = Offset(
+            screenSize.width - math.min(viewWidth, screenSize.width),
+            topLeft.dy,
+          );
+        }
+        if (viewTopToScreenBottom < viewHeight) {
+          topLeft = Offset(
+            topLeft.dx,
+            screenSize.height - math.min(viewHeight, screenSize.height),
+          );
+        }
+        return topLeft & Size(viewWidth, viewHeight);
+      case TextDirection.rtl:
+        final viewRightToScreenLeft = anchorRect.right;
+        final viewTopToScreenBottom = screenSize.height - anchorRect.top;
+
+        var topLeft = Offset(
+          math.max(anchorRect.right - viewWidth, 0.0),
+          anchorRect.top,
+        );
+        if (viewRightToScreenLeft < viewWidth) {
+          topLeft = Offset(0.0, topLeft.dy);
+        }
+        if (viewTopToScreenBottom < viewHeight) {
+          topLeft = Offset(
+            topLeft.dx,
+            screenSize.height - math.min(viewHeight, screenSize.height),
+          );
+        }
+        return topLeft & Size(viewWidth, viewHeight);
+    }
+  }
+
+  Offset _resolvedMenuOffset({
+    required Rect baseRect,
+    required Size screenSize,
+  }) {
+    var dx = widget.menuOffset.dx;
+    var dy = widget.menuOffset.dy;
+
+    if (baseRect.left + dx < 0 || baseRect.right + dx > screenSize.width) {
+      dx = 0;
+    }
+    if (baseRect.top + dy < 0 || baseRect.bottom + dy > screenSize.height) {
+      dy = 0;
+    }
+
+    return Offset(dx, dy);
+  }
+
   Widget _buildOverlayEntry() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenSize = constraints.biggest;
-        final anchorRect = _openedAnchorRect;
-        final popupHeight = math.min(widget.maxHeight, screenSize.height);
-
-        double dx = widget.menuOffset.dx;
-        double dy = widget.menuOffset.dy;
-
-        final bottom = anchorRect.top + dy + popupHeight;
-        if (bottom > screenSize.height) {
-          dy -= bottom - screenSize.height;
-        }
-
-        final top = anchorRect.top + dy;
-        if (top < 0) {
-          dy -= top;
-        }
-
-        final availableHeight = math.max(
-          140.0,
-          screenSize.height - math.max(anchorRect.top + dy, 0),
+        final baseRect = _basePopupRect(screenSize, Directionality.of(context));
+        final resolvedOffset = _resolvedMenuOffset(
+          baseRect: baseRect,
+          screenSize: screenSize,
         );
-        final resolvedMaxHeight = math.min(widget.maxHeight, availableHeight);
 
         return Stack(
           clipBehavior: Clip.none,
@@ -597,13 +653,16 @@ class _GenericSearchAnchorPickerState<T, K>
               ),
             ),
             TweenAnimationBuilder<Offset>(
-              tween: Tween<Offset>(begin: Offset.zero, end: Offset(dx, dy)),
+              tween: Tween<Offset>(begin: Offset.zero, end: resolvedOffset),
               duration: widget.menuOffsetAnimationDuration,
               builder: (context, offset, _) {
                 return Positioned(
-                  left: anchorRect.left + offset.dx,
-                  top: anchorRect.top + offset.dy,
-                  child: _buildPopupSurface(resolvedMaxHeight),
+                  left: baseRect.left + offset.dx,
+                  top: baseRect.top + offset.dy,
+                  child: _buildPopupSurface(
+                    width: baseRect.width,
+                    maxHeight: baseRect.height,
+                  ),
                 );
               },
             ),
