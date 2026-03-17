@@ -123,6 +123,7 @@ You can use your own `SearchAnchorPicker` for nested pickers, or use the `SubPic
 It handles synchronization with the parent picker:
 *   **Removals**: If items are removed in the sub-picker, they are automatically removed from the parent's pending selection.
 *   **Additions**: Added items are **NOT** automatically selected in the parent (defaulting to "unselected"), giving you control.
+*   **Popup positioning**: Use `menuOffset` to shift the nested popup relative to its trigger, and `menuOffsetAnimationDuration` to control how quickly that offset animates in.
 
 ```dart
 SubPickerTile<MyItem>(
@@ -130,6 +131,8 @@ SubPickerTile<MyItem>(
   config: subConfig,
   parentActions: actions, // Pass parent actions to automate removal cleanup
   initialSelectedIds: currentSubIds,
+  menuOffset: const Offset(40, 12), // from trigger position
+  menuOffsetAnimationDuration: const Duration(milliseconds: 120),
   onFinish: (ids, {required added, required removed}) async {
       // 1. Update your data model (e.g. repository)
       await myRepo.add(added);

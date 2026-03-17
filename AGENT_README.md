@@ -18,8 +18,11 @@ The main widget that opens a search view.
   button that opens the picker. Note the `int version` parameter: it increments every time the picker closes, allowing
   you to force a rebuild(via ValueKey(version) if needed.)
 - **`triggerChild`**: `Widget?` - (Optional) Alternative to `triggerBuilder`. A static child that, when tapped, opens the picker.
+- **`menuOffset`**: `Offset` - (Optional) Animated popup offset, mainly useful for submenus that should open to the side or slightly below the trigger.
+- **`menuOffsetAnimationDuration`**: `Duration` - Controls how quickly the popup moves to `menuOffset`.
 
 > **Note**: `SearchAnchorPicker<T>` is a convenient subclass fixed to `K=int`.
+> **Internal note**: despite the name, popup layout is now handled by a custom `OverlayEntry`, not the stock `SearchAnchor` route.
 
 ### `GenericPickerConfig<T, K>`
 Configuration object.
@@ -97,6 +100,7 @@ headerBuilder: (ctx, actions, allItems) {
     SubPickerTile<MyItem>(
       parentActions: actions, // Pass parent actions to sync state
       title: 'Add External Users',
+      menuOffset: const Offset(40, 12),
       // ... config for sub-picker ...
       onFinish: (ids, {required added, required removed}) async {
         // 1. Update your actual data source
@@ -184,6 +188,9 @@ triggerBuilder: (context, open, _) {
 
 - **Async & State**: Always use `PickerConfig.listenable` if your data changes externally (e.g., via sub-pickers). The picker won't reload automatically otherwise.
 - **Keys**: unique keys are crucial for `SubPickerTile` to ensure they don't lose state during parent rebuilds. Use `actions.getKey('unique_id')`.
+- **Popup layout**: Do not assume Flutter's stock `SearchAnchor` route semantics anymore. The picker now uses a custom overlay surface, which is why submenu geometry can extend outside the parent popup.
+- **Search header**: The popup header uses a Material `SearchBar` with localized back/clear/hint strings. If you restyle it, preserve text editing behavior and `MaterialLocalizations`.
+- **Offsets**: `menuOffset` is intended primarily for nested pickers. It shifts the popup surface, not the trigger widget.
 - **Layout**: The library separates the "Anchor" (trigger) from the "Display" (chips). You usually want to build a custom `Column` or `Wrap` to show selected chips *outside* the picker, using `triggerBuilder` just for the open button.
 - **Performance**: The picker uses `ListView.builder` but filters locally. For massive datasets (>10k), consider implementing server-side search (though `loadItems` currently expects a full list return).
 - **Ghost Selections**: Use `autoRemoveDanglingSelections` to prevent "ghost" selections (count > 0 but no checks visible) when items are removed from the data source while selected.

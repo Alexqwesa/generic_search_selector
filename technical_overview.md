@@ -1,54 +1,83 @@
 # Technical Overview: Generic Search Selector
 
-This document provides a technical deep-dive into the `SearchAnchorPicker` library, explaining the architectural decisions, edge case handling, and the rationale behind specific fixes (Keys, PostFrameCallback, etc.).
+This document provides a technical deep-dive into the `SearchAnchorPicker` library, explaining the architectural decisions, edge case handling, and the rationale behind specific fixes such as key management, post-frame scheduling, and popup positioning.
 
 ## General Architecture
 
-The library extends Flutter's `SearchAnchor` to create a reusable, state-aware picker widget.
+The library began as a wrapper around Flutter's `SearchAnchor`, but nested pickers eventually needed more control than the stock search-view route could provide. The public API still looks like a search-anchor-based picker, while the popup itself is now rendered with a custom overlay.
 
-*   **`SearchAnchorPicker<T>`**: The main entry point. It wraps `SearchAnchor` and manages high-level configuration (items repo, selection mode, styling).
-*   **`PickerActions<T>`**: A controller object passed to the header builder. It exposes methods to modify selection state (`pendingN`), allowing sub-pickers or custom buttons to interact with the main picker.
-*   **`OverlayBody<T>`**: The widget displayed inside the `SearchAnchor`'s view overlay. It renders the list of items (`ListView`) and the header.
-*   **State Management**: Instead of depending on simple `setState`, the library uses `ValueNotifier`s (`pendingN`, `viewTickN`) to granularly update parts of the UI (like the selection count or the list content) without rebuilding the entire overlay unnecessarily.
+* **`SearchAnchorPicker<T>`**: The main entry point. It manages high-level configuration, opens the popup, and handles selection lifecycle.
+* **`PickerActions<T>`**: A controller object passed to the header builder. It exposes methods to modify selection state (`pendingN`), allowing sub-pickers or custom buttons to interact with the main picker.
+* **`OverlayBody<T>`**: The widget displayed inside the popup surface. It renders the list of items and any custom header content.
+* **State Management**: Instead of depending only on `setState`, the library uses `ValueNotifier`s (`pendingN`, `viewTickN`) to update selection and list content without rebuilding everything unnecessarily.
 
-## Edge Cases & technical Decisions
+## Edge Cases And Technical Decisions
 
-### 1. `CanPop` and `PopScope`
+### 1. Custom overlay instead of raw `SearchAnchor` route
 **Why it's needed:**
-The `SearchAnchor` overlay functions like a route on the navigator stack. When the user taps "Back" or clicks outside, the system attempts to "pop" this route.
-*   **Role**: We use `PopScope` in `OverlayBody` to intercept this pop event.
-*   **Logic**: It allows us to trigger cleanup logic (like resetting search text) or saving state before the view actually closes.
-*   **Crash Prevention**: It ensures that we don't try to access the `SearchController` *after* the route has already technically closed but the widget is still in the tree during the exit animation.
+Nested sub-pickers exposed two limitations of the stock `SearchAnchor` route:
 
-### 2. The `GlobalKey` (and `KeyManager`)
+* It clamps popup geometry to the route bounds, which made child menus look clipped when they needed to extend past the parent popup's right edge.
+* Its internal popup positioning was difficult to control for submenu offsets and produced transform-related issues in nested overlay scenarios.
+
+**Current approach:**
+
+* The picker inserts an `OverlayEntry` into the current route overlay.
+* Popup coordinates are measured from the trigger widget when the popup opens.
+* The popup is placed with normal `Positioned` layout, not `CompositedTransformFollower`.
+* This allows submenu popups to extend outside the parent popup's visual bounds when desired.
+
+### 2. `PopScope`
+**Why it's still needed:**
+Even with a custom popup, back-navigation semantics still matter.
+
+* **Role**: `PopScope` in `OverlayBody` allows the picker to react correctly when the user navigates back.
+* **Logic**: It ensures cleanup logic still runs before the picker finalizes its result and closes.
+
+### 3. The `GlobalKey` manager
 **Why keys are crucial:**
-When the `SearchAnchor` view opens, it mounts the `OverlayBody` into a separate part of the widget tree (the Overlay).
-*   **The Issue**: If the overlay rebuilds (e.g., due to a `setState` in `SearchAnchorPicker`), Flutter might lose track of the identity of internal widgets, especially expensive ones like nested `SearchAnchorPicker`s (Sub-pickers).
-*   **Symptoms**: Without keys, opening a sub-picker and then triggering a rebuild in the parent could cause the sub-picker to lose its state or close unexpectedly.
-*   **Solution**: `GlobalKey`s ensure that a specific widget in the code corresponds to the exact same Element in the framework's render tree, even if parents rebuild.
-*   **Automated Manager**: We implemented `getKey(id)` to automatically assign and manage these keys, so the user doesn't have to manually create `final key = GlobalKey()` for every item.
+When the popup opens, `OverlayBody` is mounted in a separate overlay subtree.
 
-### 3. `addPostFrameCallback`
+* **The issue**: If the popup rebuilds, Flutter can lose track of the identity of internal widgets, especially nested sub-pickers.
+* **Symptoms**: A sub-picker can lose state or close unexpectedly when the parent popup rebuilds.
+* **Solution**: Stable `GlobalKey`s preserve widget identity across rebuilds.
+* **Automated manager**: `getKey(id)` assigns and caches keys automatically, so callers do not need to manually manage them for every nested widget.
+
+### 4. `addPostFrameCallback`
 **Why it's needed:**
 You often see this pattern:
+
 ```dart
 WidgetsBinding.instance.addPostFrameCallback((_) {
   _pendingN.value = ...;
 });
 ```
-*   **The Constraint**: In Flutter, you cannot call `setState` (or notify listeners that trigger a build) *while* a widget is currently building.
-*   **The Scenario**: A sub-picker might close and return a result to the parent. The parent receives this result in `onFinish` or `didUpdateWidget` and wants to update its UI immediately.
-*   **The Crash**: If this update happens synchronously during the build phase of the parent, Flutter throws "setState() called during build".
-*   **The Fix**: `postFrameCallback` schedules the update to happen *after* the current frame takes shape, satisfying Flutter's lifecycle rules.
+
+* **The constraint**: In Flutter, you cannot trigger rebuild-causing state changes while a widget is still building.
+* **The scenario**: A sub-picker closes and returns a result to the parent, and the parent wants to update immediately.
+* **The crash**: If that update happens synchronously during build, Flutter throws a "setState() called during build" error.
+* **The fix**: `postFrameCallback` defers the update until after the current frame is complete.
+
+### 5. `menuOffset` for nested popups
+**Why it exists:**
+Submenus often need slightly different coordinates than the trigger tile's exact position.
+
+* **API**: `GenericSearchAnchorPicker` and `GenericSubPickerTile` expose `menuOffset` and `menuOffsetAnimationDuration`.
+* **Behavior**: The popup opens at the measured trigger position and quickly animates to the requested offset.
+* **Use case**: This is mainly for nested menus that should open to the side or slightly below the trigger.
+
+### 6. Search header styling
+The popup header uses a real Material `SearchBar` rather than a plain `TextField`.
+
+* **Why**: It more closely matches Flutter's built-in search UI and keeps the search field behavior familiar.
+* **Localization**: Back, clear, and search hint strings are taken from `MaterialLocalizations` when possible.
 
 ## Conclusion
 
-**This library is a good extension for `SearchAnchor`**
+The library now solves the major boilerplate problems of searchable nested pickers without relying on the stock `SearchAnchor` route for popup layout:
 
+1. **State persistence**: It keeps selected items stable even when the popup closes.
+2. **Nesting**: It supports sub-pickers whose popups can extend beyond parent popup bounds.
+3. **Cleaner code**: `PickerConfig` and related abstractions keep data loading separate from UI behavior.
 
-It successfully solves the major boilerplate problems of using raw `SearchAnchor`s:
-1.  **State Persistence**: It handles the complex dance of keeping selected items in memory even when the overlay is closed.
-2.  **Nesting**: It provides a robust architecture for "Sub-pickers" (nested searches), which is notoriously difficult to get right with raw Flutter widgets due to the disposal lifecycle issues we fixed.
-3.  **Cleaner Code**: The `ItemsRepo` and `PickerConfig` abstractions separate *data fetching* from *UI rendering*, following clean architecture principles.
-
-**Caveat**: The internal complexity (lifecycle management, keys) is high, but that is exactly why this library is valuable—it encapsulates that complexity so the consumer code (`main.dart`) remains simple.
+The internal complexity is still real, but that is exactly why the library is valuable: it hides overlay lifecycle, geometry, and key-management details behind a much simpler consumer-facing API.
