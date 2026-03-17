@@ -136,11 +136,11 @@ class SearchAnchorPicker<T> extends GenericSearchAnchorPicker<T, int> {
 class _GenericSearchAnchorPickerState<T, K>
     extends State<GenericSearchAnchorPicker<T, K>> {
   late final SearchController _owned = SearchController();
-  final GlobalKey _anchorKey = GlobalKey();
   OverlayEntry? _overlayEntry;
   OverlayState? _overlayState;
   Rect _openedAnchorRect = Rect.zero;
   Size _openedAnchorSize = Size.zero;
+  BuildContext? _triggerContext;
 
   SearchController get _ctrl => widget.searchController ?? _owned;
 
@@ -353,7 +353,7 @@ class _GenericSearchAnchorPickerState<T, K>
   }
 
   Size _anchorSize() {
-    final anchorContext = _anchorKey.currentContext;
+    final anchorContext = _triggerContext;
     if (anchorContext == null) {
       return Size(widget.minWidth, 0);
     }
@@ -362,7 +362,7 @@ class _GenericSearchAnchorPickerState<T, K>
   }
 
   Rect _currentAnchorRect() {
-    final anchorContext = _anchorKey.currentContext;
+    final anchorContext = _triggerContext;
     if (anchorContext == null) {
       return Offset.zero & Size(widget.minWidth, 0);
     }
@@ -627,7 +627,12 @@ class _GenericSearchAnchorPickerState<T, K>
             onPressed: _requestOpen,
           );
 
-    return KeyedSubtree(key: _anchorKey, child: trigger);
+    return Builder(
+      builder: (triggerContext) {
+        _triggerContext = triggerContext;
+        return trigger;
+      },
+    );
   }
 }
 

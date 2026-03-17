@@ -16,7 +16,7 @@ Online demo:
 
 Technical deep dive:
 - See `docs/TECHNICAL_OVERVIEW.md` for architecture, lifecycle edge cases,
-  and why some fixes exist (Keys, PostFrameCallback, etc.).
+  and why some fixes exist (dynamic keys, PostFrameCallback, etc.).
 
 
 ## Features
@@ -123,6 +123,8 @@ You can use your own `SearchAnchorPicker` for nested pickers, or use the `SubPic
 It handles synchronization with the parent picker:
 *   **Removals**: If items are removed in the sub-picker, they are automatically removed from the parent's pending selection.
 *   **Additions**: Added items are **NOT** automatically selected in the parent (defaulting to "unselected"), giving you control.
+*   **Popup positioning**: Use `menuOffset` to shift the nested popup relative to its trigger, and `menuOffsetAnimationDuration` to control how quickly that offset animates in.
+*   **Scalability**: Closed pickers do not keep a permanent trigger `GlobalKey`; popup-only keys are created on demand and cleared when the popup closes.
 
 ```dart
 SubPickerTile<MyItem>(
@@ -130,6 +132,8 @@ SubPickerTile<MyItem>(
   config: subConfig,
   parentActions: actions, // Pass parent actions to automate removal cleanup
   initialSelectedIds: currentSubIds,
+  menuOffset: const Offset(40, 12), // from trigger position
+  menuOffsetAnimationDuration: const Duration(milliseconds: 120),
   onFinish: (ids, {required added, required removed}) async {
       // 1. Update your data model (e.g. repository)
       await myRepo.add(added);
@@ -144,5 +148,16 @@ SubPickerTile<MyItem>(
 headerBuilder: (context, actions) => allUnitsHeader(context, actions, allJsas, ref),
 footerBuilder: 
 customActions?
+- enum PopupThemes{glass , classic}
+- don't use external listen - it only needed while popup is open, use additional list as listenable provided by picker (if needed to update listenable.value=[...old])
+- editItem callback 
+- in agent_readme maybe add comments // ui state updated by library, but you need to persist the changes 
+- check MediaQuery.of(context).size - if there is enogh space - use some offset for sublist popup (slightly below trigger)  
+- is window size very small  - use fullscreen popups   like my   SmartAlertDialog(fullscreenBreakpoint: 600, ...
+- UX problem: users didn't understand that there is search field in popup - add some hint or icon
+- make it more like material 3 SearchAnchor - pass through parameters to SearchAnchor
+- allow more small customizations - like icon, trailingIcons of items in list without full itemBuilder
+- allow: selectedStyle (bold default)? better selectedWidget?
+ 
 
 ## MIT License
