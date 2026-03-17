@@ -162,4 +162,123 @@ void main() {
     await tester.tap(find.text('Custom Item 1'));
     await tester.pump();
   });
+
+  testWidgets('SubPickerTile applies animated menuOffset to submenu position', (
+    tester,
+  ) async {
+    Future<void> pumpSubPicker(Offset menuOffset) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.topLeft,
+              child: SubPickerTile<int>(
+                title: 'Sub Picker',
+                menuOffset: menuOffset,
+                config: PickerConfig(
+                  loadItems: (_) async => [1, 2],
+                  idOf: (i) => i,
+                  labelOf: (i) => '$i',
+                  searchTermsOf: (_) => [],
+                ),
+                initialSelectedIds: const [],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    await pumpSubPicker(Offset.zero);
+    await tester.tap(find.text('Sub Picker'));
+    await tester.pumpAndSettle();
+
+    final withoutOffsetPosition = tester.getTopLeft(find.text('1').last);
+
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    const menuOffset = Offset(32, 18);
+    await pumpSubPicker(menuOffset);
+    await tester.tap(find.text('Sub Picker'));
+    await tester.pumpAndSettle();
+
+    final withOffsetPosition = tester.getTopLeft(find.text('1').last);
+
+    expect(
+      withOffsetPosition.dx,
+      moreOrLessEquals(withoutOffsetPosition.dx + menuOffset.dx, epsilon: 1),
+    );
+    expect(
+      withOffsetPosition.dy,
+      moreOrLessEquals(withoutOffsetPosition.dy + menuOffset.dy, epsilon: 1),
+    );
+  });
+
+  testWidgets('SubPickerTile opens with offset without follower-layer errors', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubPickerTile<int>(
+            title: 'Sub Picker',
+            menuOffset: const Offset(40, 40),
+            config: PickerConfig(
+              loadItems: (_) async => [1, 2],
+              idOf: (i) => i,
+              labelOf: (i) => '$i',
+              searchTermsOf: (i) => ['$i'],
+            ),
+            initialSelectedIds: const [],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Sub Picker'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(find.text('1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SubPickerTile search field is editable and filters items', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SubPickerTile<int>(
+            title: 'Sub Picker',
+            menuOffset: const Offset(24, 12),
+            config: PickerConfig(
+              loadItems: (_) async => [1, 2],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Sub Picker'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'Item 2');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Item 1'), findsNothing);
+    expect(
+      find.ancestor(
+        of: find.text('Item 2').last,
+        matching: find.byType(CheckboxListTile),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

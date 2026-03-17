@@ -232,6 +232,7 @@ class _DemoHomeState extends State<DemoHome> {
                           title: 'Add/remove from Sub A1',
                           icon: Icons.playlist_add,
                           config: subA1Config,
+                          menuOffset: Offset(40, 40),
                           initialSelectedIds: _intersectionIds(
                             listA.items,
                             subA1.items,
