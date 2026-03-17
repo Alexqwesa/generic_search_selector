@@ -56,6 +56,8 @@ dependencies:
 Minimal multi-select with local state.
 (Works the same with Riverpod/Bloc/etc — just update your state in onToggle.)
 
+Use `triggerBuilder` for opening the picker so the trigger can react to picker version changes.
+
 ```dart
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/picker_config.dart';

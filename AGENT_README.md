@@ -16,8 +16,8 @@ The main widget that opens a search view.
 - **`headerBuilder`**: Defines custom widgets (like sub-pickers) at the top of the list.
 - **`triggerBuilder`**: `Widget Function(BuildContext, VoidCallback open, int version)?` - (Optional) Builder for the
   button that opens the picker. Note the `int version` parameter: it increments every time the picker closes, allowing
-  you to force a rebuild(via ValueKey(version) if needed.)
-- **`triggerChild`**: `Widget?` - (Optional) Alternative to `triggerBuilder`. A static child that, when tapped, opens the picker.
+  you to force a rebuild(via ValueKey(version) if needed.) This is the preferred trigger API.
+- **`triggerChild`**: `Widget?` - (Optional) Supported on the main picker as a simpler static trigger, but prefer `triggerBuilder` when you need the trigger to react to picker lifecycle or external state.
 - **`menuOffset`**: `Offset` - (Optional) Animated popup offset, mainly useful for submenus that should open to the side or slightly below the trigger.
 - **`menuOffsetAnimationDuration`**: `Duration` - Controls how quickly the popup moves to `menuOffset`.
 
@@ -90,6 +90,8 @@ SearchAnchorPicker<MyItem>(
       IconButton(icon: Icon(Icons.add), onPressed: open),
 )
 ```
+
+Prefer `triggerBuilder` in examples and integrations so the trigger can react to popup version changes and surrounding state. `triggerChild` is still valid on the main picker when you only need a simple static tappable child.
 
 ### Sub-Pickers (Nested Selection)
 Use `SubPickerTile` inside `headerBuilder` to allow modifying the list *from within* the picker.
