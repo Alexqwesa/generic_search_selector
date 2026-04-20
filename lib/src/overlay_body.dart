@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:generic_search_selector/src/overflow_tooltip_text.dart';
+import 'package:generic_search_selector/src/passive_tooltip.dart';
 import 'package:generic_search_selector/src/picker_debug.dart';
 import 'package:generic_search_selector/src/picker_config.dart';
 
@@ -190,7 +191,7 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
 
                             final labelWidget = (tip == null)
                                 ? OverflowTooltipText(label)
-                                : Tooltip(
+                                : PassiveTooltip(
                                     message: tip,
                                     child: Text(
                                       label,

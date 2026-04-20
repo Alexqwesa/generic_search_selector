@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:generic_search_selector/src/passive_tooltip.dart';
 
 /// Text that shows a Tooltip only when it overflows (ellipsis is applied).
 class OverflowTooltipText extends StatelessWidget {
@@ -44,7 +45,7 @@ class OverflowTooltipText extends StatelessWidget {
 
         if (!didOverflow) return child;
 
-        return Tooltip(
+        return PassiveTooltip(
           message: tooltip ?? text,
           child: child,
         );
