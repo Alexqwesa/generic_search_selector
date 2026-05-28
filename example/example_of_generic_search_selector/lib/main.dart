@@ -167,10 +167,7 @@ class _DemoHomeState extends State<DemoHome> {
   Widget build(BuildContext context) {
     final universe = buildUniverse();
 
-    final mainAConfig = configForRepo(
-      listA,
-      title: 'Icon #1 main list',
-    ).copyWith(autoRemoveDanglingSelections: true);
+    final mainAConfig = configForRepo(listA, title: 'Icon #1 main list');
     final subA1Config = configForRepo(
       subA1,
       title: 'Sub A1',

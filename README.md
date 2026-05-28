@@ -15,8 +15,12 @@ Online demo:
 - Example app (web): <ADD_YOUR_ONLINE_DEMO_LINK_HERE>
 
 Technical deep dive:
-- See `docs/TECHNICAL_OVERVIEW.md` for architecture, lifecycle edge cases,
+- See `technical_overview.md` for architecture, lifecycle edge cases,
   and why some fixes exist (dynamic keys, PostFrameCallback, etc.).
+
+**Agents & integrators:**
+- See [`docs/AGENTS.md`](docs/AGENTS.md) for pattern choice (sublist vs main list),
+  async pitfalls, and `initialSelectedIds` behavior.
 
 
 ## Features
@@ -137,7 +141,7 @@ SubPickerTile<MyItem>(
   menuOffset: const Offset(40, 12), // from trigger position
   menuOffsetAnimationDuration: const Duration(milliseconds: 120),
   onFinish: (ids, {required added, required removed}) async {
-      // 1. Update your data model (e.g. repository)
+      // 1. Update your data model (e.g. repository) — save-on-close
       await myRepo.add(added);
       await myRepo.remove(removed);
       
@@ -146,6 +150,59 @@ SubPickerTile<MyItem>(
 )
 ```
 
+**Save-on-close (default):** `SubPickerTile` updates checkboxes while the sub-popup is open and calls `onFinish` once when it closes. That is the library-intended flow for sublist membership.
+
+**Save-on-each-click:** not the default for `SubPickerTile`. Use a nested `SearchAnchorPicker` with `onToggle` (see below) or `OnToggleMode.optimistic`.
+
+## Async `onToggle`
+
+By default (`OnToggleMode.awaitGate`), the picker **waits** for `onToggle` before moving the checkbox. A slow `await` (network, DB) freezes the UI until the future completes.
+
+Use **`OnToggleMode.optimistic`** when you want immediate checkbox feedback and background persistence (failed saves revert the toggle):
+
+```dart
+SearchAnchorPicker<Person>(
+  config: config,
+  initialSelectedIds: selectedIds,
+  onToggleMode: OnToggleMode.optimistic,
+  onToggle: (person, next) async {
+    try {
+      await api.setSelected(person.id, next);
+      return true;
+    } catch (_) {
+      return false; // reverts checkbox
+    }
+  },
+  triggerBuilder: (_, open, __) => IconButton(onPressed: open, icon: const Icon(Icons.people)),
+);
+```
+
+| Mode | Checkbox | `onToggle` |
+|------|----------|------------|
+| `awaitGate` (default) | After `onToggle` returns `true` | Awaited first; return `false` to reject |
+| `optimistic` | Immediately (multi mode) | Runs in background; `false` reverts |
+
+For **validation** (max items, permissions), keep **`awaitGate`** and return `false` to block the change.
+
+See [`docs/AGENTS.md`](docs/AGENTS.md) for sublist vs main-list patterns and `initialSelectedIds` sync rules.
+
+## Client-side vs server-side item loading
+
+`loadItems` is display/search data, not deletion truth. If a selected ID is missing from the current result, the picker keeps it selected.
+
+This makes both full client-side lists and server-side search/pagination safe by default:
+
+```dart
+PickerConfig<Person>(
+  loadItems: (_) => api.searchPeople(...), // full list or current page
+  idOf: (p) => p.id,
+  labelOf: (p) => p.name,
+  searchTermsOf: (p) => [p.name],
+);
+```
+
+`onFinish(... removed:)` reports only explicit picker removals: user unselects or header code such as `actions.setPending(...)`, `toggleId(...)`, or `selectNone()`. Parent `initialSelectedIds` changes may reseed the final `ids`, but they are not reported as `removed`; this prevents a temporary empty seed from triggering delete APIs.
+
 ## TODO: 
 headerBuilder: (context, actions) => allUnitsHeader(context, actions, allJsas, ref),
 footerBuilder: 
@@ -153,7 +210,6 @@ customActions?
 - enum PopupThemes{glass , classic}
 - don't use external listen - it only needed while popup is open, use additional list as listenable provided by picker (if needed to update listenable.value=[...old])
 - editItem callback 
-- in agent_readme maybe add comments // ui state updated by library, but you need to persist the changes 
 - check MediaQuery.of(context).size - if there is enogh space - use some offset for sublist popup (slightly below trigger)  
 - is window size very small  - use fullscreen popups   like my   SmartAlertDialog(fullscreenBreakpoint: 600, ...
 - UX problem: users didn't understand that there is search field in popup - add some hint or icon

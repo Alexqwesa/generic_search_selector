@@ -13,7 +13,9 @@ import 'package:generic_search_selector/src/picker_config.dart';
 /// Key properties:
 /// - **No GlobalKey**
 /// - In-overlay selection stored in [_pendingN] (ValueNotifier)
-/// - External seed ([initialSelectedIds]) is synced only when popup is not open
+/// - External seed ([initialSelectedIds]): while **closed**, parent updates re-seed
+///   the next open; while **open**, changes may still sync into pending (post-frame)
+///   for nested sub-picker membership — see `docs/AGENTS.md`
 /// - Close is always deferred (post-frame) to avoid overlay/build-scope assertions
 /// - Optional [PickerConfig.listenable] allows live updates (e.g. ChangeNotifier repo)
 class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
@@ -23,6 +25,7 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
     required this.initialSelectedIds,
     this.mode = PickerMode.multi,
     this.onToggle,
+    this.onToggleMode = OnToggleMode.awaitGate,
     this.onFinish,
     this.searchController,
     this.triggerBuilder,
@@ -43,14 +46,16 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
 
   final GenericPickerConfig<T, K> config;
 
-  /// External seed selection.
-  /// While overlay is open, changes here will NOT clobber pending selection.
+  /// External seed selection (see class doc and `docs/AGENTS.md`).
   final List<K> initialSelectedIds;
 
   final PickerMode mode;
 
   /// Optional gate (e.g. remote ops). Return false to reject UI change.
   final Future<bool> Function(T item, bool nextSelected)? onToggle;
+
+  /// Whether [onToggle] runs before or after in-overlay checkbox updates.
+  final OnToggleMode onToggleMode;
 
   /// Called once when overlay closes (diff vs open snapshot).
   final GenericOnFinish<K>? onFinish;
@@ -116,6 +121,7 @@ class SearchAnchorPicker<T> extends GenericSearchAnchorPicker<T, int> {
     required super.initialSelectedIds,
     super.mode,
     super.onToggle,
+    super.onToggleMode,
     super.onFinish,
     super.searchController,
     super.triggerBuilder,
@@ -157,6 +163,7 @@ class _GenericSearchAnchorPickerState<T, K>
   );
 
   Set<K> _openedSnapshot = <K>{};
+  final Set<K> _explicitlyRemoved = <K>{};
   bool _open = false;
 
   int _tick = 0;
@@ -209,18 +216,6 @@ class _GenericSearchAnchorPickerState<T, K>
     widget.config.loadItems(context).then((items) {
       if (!mounted) return;
 
-      // Auto-cleanup dangling selections if configured
-      if (widget.config.autoRemoveDanglingSelections) {
-        final currentPending = _pendingN.value;
-        if (currentPending.isNotEmpty) {
-          final validIds = items.map(widget.config.idOf).toSet();
-          final newPending = currentPending.intersection(validIds);
-          if (newPending.length != currentPending.length) {
-            _pendingN.value = newPending;
-          }
-        }
-      }
-
       _itemsSnapshot = items;
       // _loading = false;
       _viewTickN.value++;
@@ -241,8 +236,7 @@ class _GenericSearchAnchorPickerState<T, K>
       _attachListenable(widget.config.listenable);
     }
 
-    // Sync from external seed.
-    // We allow this even if open, to support use cases like "Sub Picker" updating valid selection.
+    // Sync external seed into pending (even while open — sub-picker membership).
     if (!_listEquals(oldWidget.initialSelectedIds, widget.initialSelectedIds)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _pendingN.value = widget.initialSelectedIds.toSet();
@@ -288,6 +282,7 @@ class _GenericSearchAnchorPickerState<T, K>
 
   void _onOpen() {
     _openedSnapshot = widget.initialSelectedIds.toSet();
+    _explicitlyRemoved.clear();
     _pendingN.value = {..._openedSnapshot};
 
     _stableIds = <K>[];
@@ -327,7 +322,9 @@ class _GenericSearchAnchorPickerState<T, K>
     final after = _pendingN.value;
 
     final added = after.difference(before).toList();
-    final removed = before.difference(after).toList();
+    final removed = _explicitlyRemoved
+        .intersection(before.difference(after))
+        .toList();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -477,6 +474,7 @@ class _GenericSearchAnchorPickerState<T, K>
           mode: widget.mode,
           getKey: _getKey,
           refresh: _reload,
+          recordPendingChange: _recordPendingChange,
         );
 
         final header = widget.headerBuilder != null
@@ -498,11 +496,18 @@ class _GenericSearchAnchorPickerState<T, K>
           mode: widget.mode,
           config: widget.config,
           onToggleGate: widget.onToggle,
+          onToggleMode: widget.onToggleMode,
+          recordPendingChange: _recordPendingChange,
           close: _close,
           itemBuilder: widget.itemBuilder,
         );
       },
     );
+  }
+
+  void _recordPendingChange(Set<K> before, Set<K> after) {
+    _explicitlyRemoved.addAll(before.difference(after));
+    _explicitlyRemoved.removeAll(after);
   }
 
   Widget _buildSearchField() {

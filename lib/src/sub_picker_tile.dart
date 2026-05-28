@@ -6,6 +6,11 @@ import 'package:generic_search_selector/src/search_anchor_picker.dart';
 ///
 /// Reduces boilerplate for the common pattern of nested pickers in the header.
 /// Can optionally synchronize selection changes with a parent [GenericPickerActions].
+///
+/// **Persistence:** checkboxes update in-overlay immediately; your app should persist
+/// in [onFinish] when the sub-popup closes (save-on-close). For save-on-each-click,
+/// use [GenericSearchAnchorPicker] with [GenericSearchAnchorPicker.onToggle] and
+/// [OnToggleMode.optimistic] instead — see `docs/AGENTS.md`.
 class GenericSubPickerTile<T, K> extends StatelessWidget {
   const GenericSubPickerTile({
     super.key,

@@ -1,6 +1,6 @@
 name: generic_search_selector
 description: "Generic SearchAnchor-based picker (multi-select / radio) with stable in-overlay state and optional header actions via InheritedWidget scope."
-version: 0.0.1
+version: 0.0.2
 homepage:
 
 environment:

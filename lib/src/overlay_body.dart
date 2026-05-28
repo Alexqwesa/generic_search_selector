@@ -89,6 +89,8 @@ class OverlayBody<T, K> extends StatefulWidget {
     required this.mode,
     required this.config,
     required this.onToggleGate,
+    this.onToggleMode = OnToggleMode.awaitGate,
+    required this.recordPendingChange,
     required this.close,
     this.itemBuilder,
   });
@@ -104,6 +106,8 @@ class OverlayBody<T, K> extends StatefulWidget {
   final GenericPickerConfig<T, K> config;
 
   final Future<bool> Function(T item, bool nextSelected)? onToggleGate;
+  final OnToggleMode onToggleMode;
+  final void Function(Set<K> before, Set<K> after) recordPendingChange;
   final void Function([String? reason, bool skipCloseView]) close;
   final Widget Function(
     BuildContext context,
@@ -204,7 +208,15 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                               PickerDebug.log(
                                 'OverlayBody: User toggle item=$item, next=$next',
                               );
-                              if (widget.onToggleGate != null) {
+
+                              final useOptimistic =
+                                  widget.onToggleMode ==
+                                      OnToggleMode.optimistic &&
+                                  widget.mode == PickerMode.multi &&
+                                  widget.onToggleGate != null;
+
+                              if (!useOptimistic &&
+                                  widget.onToggleGate != null) {
                                 final ok = await widget.onToggleGate!(
                                   item,
                                   next,
@@ -224,7 +236,12 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                   return;
                                 }
 
-                                widget.pendingN.value = next ? {id} : {};
+                                final nextPending = next ? {id} : <K>{};
+                                widget.recordPendingChange(
+                                  current,
+                                  nextPending,
+                                );
+                                widget.pendingN.value = nextPending;
                                 widget.close('radio');
                                 return;
                               }
@@ -260,9 +277,24 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                 }
                               }
 
+                              final revertTo = {...current};
                               final s = {...current};
                               next ? s.add(id) : s.remove(id);
+                              widget.recordPendingChange(current, s);
                               widget.pendingN.value = s;
+
+                              if (useOptimistic) {
+                                unawaited(() async {
+                                  final ok = await widget.onToggleGate!(
+                                    item,
+                                    next,
+                                  );
+                                  if (!ok && mounted) {
+                                    widget.recordPendingChange(s, revertTo);
+                                    widget.pendingN.value = revertTo;
+                                  }
+                                }());
+                              }
                             }
 
                             if (widget.itemBuilder != null) {

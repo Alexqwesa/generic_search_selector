@@ -73,6 +73,13 @@ The popup header uses a real Material `SearchBar` rather than a plain `TextField
 * **Why**: It more closely matches Flutter's built-in search UI and keeps the search field behavior familiar.
 * **Localization**: Back, clear, and search hint strings are taken from `MaterialLocalizations` when possible.
 
+### 7. Client-side vs server-side item snapshots
+`loadItems` is treated as display/search data, not deletion truth.
+
+* **Client-side lists**: Missing selected IDs remain pending until the user explicitly removes them or caller state changes.
+* **Server-side lists**: Search pages can omit valid selections without accidentally dropping them.
+* **User intent**: `onFinish(... removed:)` is produced only by explicit picker removals (user toggles or `PickerActions`). Parent `initialSelectedIds` changes can reseed final `ids`, but do not become `removed` entries.
+
 ## Conclusion
 
 The library now solves the major boilerplate problems of searchable nested pickers without relying on the stock `SearchAnchor` route for popup layout:

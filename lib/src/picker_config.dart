@@ -10,9 +10,17 @@ typedef LoadItems<T> = Future<List<T>> Function(BuildContext context);
 /// - how to identify an item
 /// - how to render / search an item
 ///
-/// The picker keeps a stable “in-overlay” selection while open:
-/// changes to [initialSelectedIds] from outside will not clobber the user’s
-/// pending selection until the overlay is closed.
+/// In-overlay selection lives in an internal [ValueNotifier] while the popup is open.
+///
+/// **External [initialSelectedIds]:**
+/// - When the popup is **closed**, parent updates re-seed the next open.
+/// - When the popup is **open**, [GenericSearchAnchorPicker] may still sync
+///   `initialSelectedIds` into pending (post-frame) so nested sub-pickers can
+///   reflect membership changes without closing the parent. Do not rely on
+///   “ignore external seed while open” for main pickers — use [GenericPickerActions.pending]
+///   or [GenericSearchAnchorPicker.onToggle] for in-session edits.
+///
+/// See `docs/AGENTS.md` for pattern choice (SubPickerTile vs onToggle).
 class GenericPickerConfig<T, K> {
   GenericPickerConfig({
     required this.loadItems,
@@ -27,7 +35,6 @@ class GenericPickerConfig<T, K> {
     this.listenable,
     this.unselectBehavior = UnselectBehavior.allow,
     this.isItemInUse,
-    this.autoRemoveDanglingSelections = false,
   });
 
   /// internal callback to open the picker. (Set by SearchAnchorPicker).
@@ -66,7 +73,7 @@ class GenericPickerConfig<T, K> {
   ///
   /// Used for:
   /// - selection state (Set<K>)
-  /// - computing added/removed diffs on close
+  /// - computing added diffs and explicit removals on close
   /// - equality / matching across reloads
   final K Function(T) idOf;
 
@@ -127,16 +134,6 @@ class GenericPickerConfig<T, K> {
   /// If true, [unselectBehavior] will be triggered on deselection.
   final bool Function(T)? isItemInUse;
 
-  /// If true, the picker will automatically filter out selections (IDs) from [pendingN]
-  /// that are not present in the loaded `items` list after a reload.
-  ///
-  /// This is useful when items can be removed externally (e.g. via a sub-picker)
-  /// and you want the parent picker to immediately reflect that removal without
-  /// manual state management.
-  ///
-  /// Default is `false` to avoid accidental data loss if `loadItems` returns partial results.
-  final bool autoRemoveDanglingSelections;
-
   GenericPickerConfig<T, K> copyWith({
     LoadItems<T>? loadItems,
     K Function(T)? idOf,
@@ -150,7 +147,6 @@ class GenericPickerConfig<T, K> {
     Listenable? listenable,
     UnselectBehavior? unselectBehavior,
     bool Function(T)? isItemInUse,
-    bool? autoRemoveDanglingSelections,
   }) {
     return GenericPickerConfig<T, K>(
       loadItems: loadItems ?? this.loadItems,
@@ -165,8 +161,6 @@ class GenericPickerConfig<T, K> {
       listenable: listenable ?? this.listenable,
       unselectBehavior: unselectBehavior ?? this.unselectBehavior,
       isItemInUse: isItemInUse ?? this.isItemInUse,
-      autoRemoveDanglingSelections:
-          autoRemoveDanglingSelections ?? this.autoRemoveDanglingSelections,
     );
   }
 }
@@ -185,7 +179,6 @@ class PickerConfig<T> extends GenericPickerConfig<T, int> {
     super.listenable,
     super.unselectBehavior = UnselectBehavior.allow,
     super.isItemInUse,
-    super.autoRemoveDanglingSelections = false,
   });
 
   @override
@@ -202,7 +195,6 @@ class PickerConfig<T> extends GenericPickerConfig<T, int> {
     Listenable? listenable,
     UnselectBehavior? unselectBehavior,
     bool Function(T)? isItemInUse,
-    bool? autoRemoveDanglingSelections,
   }) {
     return PickerConfig<T>(
       loadItems: loadItems ?? this.loadItems,
@@ -217,8 +209,6 @@ class PickerConfig<T> extends GenericPickerConfig<T, int> {
       listenable: listenable ?? this.listenable,
       unselectBehavior: unselectBehavior ?? this.unselectBehavior,
       isItemInUse: isItemInUse ?? this.isItemInUse,
-      autoRemoveDanglingSelections:
-          autoRemoveDanglingSelections ?? this.autoRemoveDanglingSelections,
     );
   }
 }
@@ -233,6 +223,18 @@ typedef GenericOnFinish<K> =
 typedef OnFinish = GenericOnFinish<int>;
 
 enum PickerMode { multi, radio, radioToggle }
+
+/// How [GenericSearchAnchorPicker.onToggle] interacts with checkbox updates.
+enum OnToggleMode {
+  /// Await [GenericSearchAnchorPicker.onToggle] before updating in-overlay selection.
+  /// Return `false` from [GenericSearchAnchorPicker.onToggle] to reject the toggle.
+  awaitGate,
+
+  /// Update the checkbox immediately, then run [GenericSearchAnchorPicker.onToggle].
+  /// If it returns `false`, the toggle is reverted. Use for async persistence without
+  /// blocking the UI (see `docs/AGENTS.md` and README “Async onToggle”).
+  optimistic,
+}
 
 enum UnselectBehavior {
   block,
@@ -255,20 +257,24 @@ class GenericPickerActions<T, K> {
     required this.mode,
     required this.getKey,
     required VoidCallback refresh,
+    void Function(Set<K> before, Set<K> after)? recordPendingChange,
   }) : _close = close,
-       _refresh = refresh;
+       _refresh = refresh,
+       _recordPendingChange = recordPendingChange;
 
   final ValueNotifier<Set<K>> pendingN;
   final K Function(T) idOf;
   final void Function([String? reason]) _close;
   final GlobalKey Function(Object id) getKey;
   final VoidCallback _refresh;
+  final void Function(Set<K> before, Set<K> after)? _recordPendingChange;
   final PickerMode mode;
 
   Set<K> get pending => pendingN.value;
 
   void setPending(Set<K> ids) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recordPendingChange?.call(pendingN.value, ids);
       pendingN.value = ids;
     });
   }
@@ -304,6 +310,7 @@ class PickerActions<T> extends GenericPickerActions<T, int> {
     required super.mode,
     required super.getKey,
     required super.refresh,
+    super.recordPendingChange,
   });
 }
 
