@@ -25,7 +25,7 @@ void main() {
                 labelOf: (item) => item.label,
                 searchTermsOf: (item) => [item.label],
               ),
-              onFinish: (ids, {required added, required removed}) async {
+              onFinishReplaceAll: (ids) async {
                 log.add(ids);
               },
             ),
@@ -89,7 +89,7 @@ void main() {
                 labelOf: (item) => item.label,
                 searchTermsOf: (item) => [item.label],
               ),
-              onFinish: (ids, {required added, required removed}) async {
+              onFinishReplaceAll: (ids) async {
                 log.add(ids);
               },
             ),

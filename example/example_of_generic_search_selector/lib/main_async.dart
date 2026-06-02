@@ -66,34 +66,82 @@ class ItemsNotifier extends Notifier<AsyncValue<List<DemoItem>>> {
     switch (key) {
       case 'listA':
         return [
-          const DemoItem(id: 1, label: 'A: Alice (internal)', group: 'internal'),
+          const DemoItem(
+            id: 1,
+            label: 'A: Alice (internal)',
+            group: 'internal',
+          ),
           const DemoItem(id: 2, label: 'A: Bob (internal)', group: 'internal'),
         ];
       case 'subA1':
         return [
-          const DemoItem(id: 10, label: 'A1: Charlie (external)', group: 'external'),
-          const DemoItem(id: 11, label: 'A1: Diana (external)', group: 'external'),
-          const DemoItem(id: 12, label: 'A1: Overflow label test', group: 'external'),
+          const DemoItem(
+            id: 10,
+            label: 'A1: Charlie (external)',
+            group: 'external',
+          ),
+          const DemoItem(
+            id: 11,
+            label: 'A1: Diana (external)',
+            group: 'external',
+          ),
+          const DemoItem(
+            id: 12,
+            label: 'A1: Overflow label test',
+            group: 'external',
+          ),
         ];
       case 'subA2':
         return [
-          const DemoItem(id: 20, label: 'A2: Ethan (internal)', group: 'internal'),
-          const DemoItem(id: 21, label: 'A2: Fiona (internal)', group: 'internal'),
+          const DemoItem(
+            id: 20,
+            label: 'A2: Ethan (internal)',
+            group: 'internal',
+          ),
+          const DemoItem(
+            id: 21,
+            label: 'A2: Fiona (internal)',
+            group: 'internal',
+          ),
         ];
       case 'listB':
         return [
-          const DemoItem(id: 101, label: 'B: Igor (internal)', group: 'internal'),
-          const DemoItem(id: 102, label: 'B: Julia (internal)', group: 'internal'),
+          const DemoItem(
+            id: 101,
+            label: 'B: Igor (internal)',
+            group: 'internal',
+          ),
+          const DemoItem(
+            id: 102,
+            label: 'B: Julia (internal)',
+            group: 'internal',
+          ),
         ];
       case 'subB1':
         return [
-          const DemoItem(id: 110, label: 'B1: Ken (external)', group: 'external'),
-          const DemoItem(id: 111, label: 'B1: Lina (external)', group: 'external'),
+          const DemoItem(
+            id: 110,
+            label: 'B1: Ken (external)',
+            group: 'external',
+          ),
+          const DemoItem(
+            id: 111,
+            label: 'B1: Lina (external)',
+            group: 'external',
+          ),
         ];
       case 'subB2':
         return [
-          const DemoItem(id: 120, label: 'B2: Max (internal)', group: 'internal'),
-          const DemoItem(id: 121, label: 'B2: Nina (internal)', group: 'internal'),
+          const DemoItem(
+            id: 120,
+            label: 'B2: Max (internal)',
+            group: 'internal',
+          ),
+          const DemoItem(
+            id: 121,
+            label: 'B2: Nina (internal)',
+            group: 'internal',
+          ),
         ];
       default:
         return [];
@@ -101,9 +149,10 @@ class ItemsNotifier extends Notifier<AsyncValue<List<DemoItem>>> {
   }
 }
 
-final itemsProvider = NotifierProvider.family<ItemsNotifier, AsyncValue<List<DemoItem>>, String>(
-  ItemsNotifier.new,
-);
+final itemsProvider =
+    NotifierProvider.family<ItemsNotifier, AsyncValue<List<DemoItem>>, String>(
+      ItemsNotifier.new,
+    );
 
 class SetIntNotifier extends Notifier<Set<int>> {
   @override
@@ -114,8 +163,12 @@ class SetIntNotifier extends Notifier<Set<int>> {
   }
 }
 
-final selectedScreenAProvider = NotifierProvider<SetIntNotifier, Set<int>>(SetIntNotifier.new);
-final selectedScreenBProvider = NotifierProvider<SetIntNotifier, Set<int>>(SetIntNotifier.new);
+final selectedScreenAProvider = NotifierProvider<SetIntNotifier, Set<int>>(
+  SetIntNotifier.new,
+);
+final selectedScreenBProvider = NotifierProvider<SetIntNotifier, Set<int>>(
+  SetIntNotifier.new,
+);
 
 class DemoApp extends StatelessWidget {
   const DemoApp({super.key});
@@ -138,12 +191,30 @@ class DemoHome extends ConsumerStatefulWidget {
 }
 
 class _DemoHomeState extends ConsumerState<DemoHome> {
-  late final _RefListenable listAListener = _RefListenable(ref, itemsProvider('listA'));
-  late final _RefListenable subA1Listener = _RefListenable(ref, itemsProvider('subA1'));
-  late final _RefListenable subA2Listener = _RefListenable(ref, itemsProvider('subA2'));
-  late final _RefListenable listBListener = _RefListenable(ref, itemsProvider('listB'));
-  late final _RefListenable subB1Listener = _RefListenable(ref, itemsProvider('subB1'));
-  late final _RefListenable subB2Listener = _RefListenable(ref, itemsProvider('subB2'));
+  late final _RefListenable listAListener = _RefListenable(
+    ref,
+    itemsProvider('listA'),
+  );
+  late final _RefListenable subA1Listener = _RefListenable(
+    ref,
+    itemsProvider('subA1'),
+  );
+  late final _RefListenable subA2Listener = _RefListenable(
+    ref,
+    itemsProvider('subA2'),
+  );
+  late final _RefListenable listBListener = _RefListenable(
+    ref,
+    itemsProvider('listB'),
+  );
+  late final _RefListenable subB1Listener = _RefListenable(
+    ref,
+    itemsProvider('subB1'),
+  );
+  late final _RefListenable subB2Listener = _RefListenable(
+    ref,
+    itemsProvider('subB2'),
+  );
 
   DemoItem? findById(List<DemoItem>? list, int id) {
     if (list == null) return null;
@@ -222,7 +293,8 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh List A',
-            onPressed: () => ref.read(itemsProvider('listA').notifier).refreshWithDelay(),
+            onPressed: () =>
+                ref.read(itemsProvider('listA').notifier).refreshWithDelay(),
           ),
           IconButton(
             icon: const Icon(Icons.timer_off),
@@ -235,17 +307,27 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            const Text('Async Demo with Riverpod. Use top buttons to trigger refresh/delay.'),
+            const Text(
+              'Async Demo with Riverpod. Use top buttons to trigger refresh/delay.',
+            ),
             const SizedBox(height: 10),
 
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SelectedChips(title: 'Screen A', ids: selectedOnScreenA, universe: universe),
+                _SelectedChips(
+                  title: 'Screen A',
+                  ids: selectedOnScreenA,
+                  universe: universe,
+                ),
                 const SizedBox(height: 12),
                 _CircleIconTrigger(
                   child: SearchAnchorPicker<DemoItem>(
-                    config: configFor('listA', title: 'Main A', listenable: listAListener),
+                    config: configFor(
+                      'listA',
+                      title: 'Main A',
+                      listenable: listAListener,
+                    ),
                     initialSelectedIds: _ids(selectedOnScreenA),
                     mode: PickerMode.multi,
                     onToggle: (item, next) async {
@@ -256,8 +338,10 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
                       return true;
                     },
                     headerBuilder: (ctx, actions, allItems) {
-                      final lA = ref.watch(itemsProvider('listA')).asData?.value ?? [];
-                      final sA1 = ref.watch(itemsProvider('subA1')).asData?.value ?? [];
+                      final lA =
+                          ref.watch(itemsProvider('listA')).asData?.value ?? [];
+                      final sA1 =
+                          ref.watch(itemsProvider('subA1')).asData?.value ?? [];
 
                       return [
                         _SubPickerTile(
@@ -269,14 +353,17 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
                             title: 'Sub A1',
                             listenable: subA1Listener,
                             unselectBehavior: UnselectBehavior.alert,
-                            isItemInUse: (it) => selectedOnScreenA.contains(it.id),
+                            isItemInUse: (it) =>
+                                selectedOnScreenA.contains(it.id),
                           ),
                           seedIds: _intersectionIds(lA, sA1),
-                          onFinish: (ids, {required added, required removed}) async {
+                          onFinish: ({required added, required removed}) async {
                             final addItems = added
                                 .map((id) => findById(sA1, id))
                                 .whereType<DemoItem>();
-                            await ref.read(itemsProvider('listA').notifier).addAll(addItems);
+                            await ref
+                                .read(itemsProvider('listA').notifier)
+                                .addAll(addItems);
 
                             if (removed.isNotEmpty) {
                               await ref
@@ -284,14 +371,26 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
                                   .removeWhere((x) => removed.contains(x.id));
                             }
 
-                            final validIds = (ref.read(itemsProvider('listA')).asData?.value ?? [])
-                                .map((e) => e.id)
-                                .toSet();
-                            final currentScreen = Set<int>.from(ref.read(selectedScreenAProvider));
-                            currentScreen.removeWhere((id) => !validIds.contains(id));
-                            ref.read(selectedScreenAProvider.notifier).set(currentScreen);
+                            final validIds =
+                                (ref
+                                            .read(itemsProvider('listA'))
+                                            .asData
+                                            ?.value ??
+                                        [])
+                                    .map((e) => e.id)
+                                    .toSet();
+                            final currentScreen = Set<int>.from(
+                              ref.read(selectedScreenAProvider),
+                            );
+                            currentScreen.removeWhere(
+                              (id) => !validIds.contains(id),
+                            );
+                            ref
+                                .read(selectedScreenAProvider.notifier)
+                                .set(currentScreen);
 
-                            final nextPending = {...actions.pending}..removeAll(removed);
+                            final nextPending = {...actions.pending}
+                              ..removeAll(removed);
                             actions.setPending(nextPending);
                           },
                         ),
@@ -299,7 +398,9 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
                     },
                     triggerBuilder: (_, open, version) {
                       final has = selectedOnScreenA.isNotEmpty;
-                      final isLoading = ref.watch(itemsProvider('listA')).isLoading;
+                      final isLoading = ref
+                          .watch(itemsProvider('listA'))
+                          .isLoading;
                       return Stack(
                         alignment: Alignment.center,
                         children: [
@@ -307,7 +408,10 @@ class _DemoHomeState extends ConsumerState<DemoHome> {
                             iconSize: 40,
                             tooltip: 'Open picker A',
                             onPressed: open,
-                            icon: Icon(Icons.person_search, color: has ? Colors.green : null),
+                            icon: Icon(
+                              Icons.person_search,
+                              color: has ? Colors.green : null,
+                            ),
                           ),
                           if (isLoading)
                             const SizedBox(
@@ -401,7 +505,11 @@ class _SubPickerTile extends StatelessWidget {
 }
 
 class _SelectedChips extends StatelessWidget {
-  const _SelectedChips({required this.title, required this.ids, required this.universe});
+  const _SelectedChips({
+    required this.title,
+    required this.ids,
+    required this.universe,
+  });
 
   final String title;
   final Set<int> ids;
@@ -419,7 +527,10 @@ class _SelectedChips extends StatelessWidget {
             Text(title),
             const SizedBox(height: 8),
             Wrap(
-              children: [for (final id in list) Chip(label: Text(universe[id]?.label ?? '#$id'))],
+              children: [
+                for (final id in list)
+                  Chip(label: Text(universe[id]?.label ?? '#$id')),
+              ],
             ),
           ],
         ),

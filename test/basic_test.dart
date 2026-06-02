@@ -19,7 +19,7 @@ void main() {
             config: config,
             initialSelectedIds: const [],
             mode: PickerMode.multi,
-            onFinish: (all, {List<int>? added, List<int>? removed}) async {},
+            onFinish: ({required added, required removed}) async {},
           ),
         ),
       ),
@@ -47,7 +47,7 @@ void main() {
             config: config,
             initialSelectedIds: const [],
             mode: PickerMode.multi,
-            onFinish: (all, {List<int>? added, List<int>? removed}) async {},
+            onFinish: ({required added, required removed}) async {},
           ),
         ),
       ),
@@ -85,7 +85,7 @@ void main() {
                 config: config,
                 initialSelectedIds: selectedIds,
                 mode: PickerMode.multi,
-                onFinish: (all, {List<int>? added, List<int>? removed}) async {
+                onFinishReplaceAll: (all) async {
                   setState(() {
                     selectedIds = all;
                   });

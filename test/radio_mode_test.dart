@@ -23,9 +23,12 @@ void main() {
                 config: config,
                 initialSelectedIds: currentSelection,
                 mode: PickerMode.radioToggle,
-                onFinish: (ids, {required added, required removed}) async {
+                onFinish: ({required added, required removed}) async {
                   setState(() {
-                    currentSelection = ids;
+                    currentSelection = [
+                      ...currentSelection.where((id) => !removed.contains(id)),
+                      ...added,
+                    ];
                   });
                 },
               );
@@ -84,9 +87,12 @@ void main() {
                 config: config,
                 initialSelectedIds: currentSelection,
                 mode: PickerMode.radio,
-                onFinish: (ids, {required added, required removed}) async {
+                onFinish: ({required added, required removed}) async {
                   setState(() {
-                    currentSelection = ids;
+                    currentSelection = [
+                      ...currentSelection.where((id) => !removed.contains(id)),
+                      ...added,
+                    ];
                   });
                 },
               );

@@ -12,16 +12,11 @@ It is designed for cases where you need:
 - A simple API that hides overlay / lifecycle gotchas
 
 Online demo:
-- Example app (web): <ADD_YOUR_ONLINE_DEMO_LINK_HERE>
+- Example app (web): https://alexqwesa.github.io/generic_search_selector/
 
 Technical deep dive:
 - See `technical_overview.md` for architecture, lifecycle edge cases,
   and why some fixes exist (dynamic keys, PostFrameCallback, etc.).
-
-**Agents & integrators:**
-- See [`docs/AGENTS.md`](docs/AGENTS.md) for pattern choice (sublist vs main list),
-  async pitfalls, and `initialSelectedIds` behavior.
-
 
 ## Features
 
@@ -140,7 +135,7 @@ SubPickerTile<MyItem>(
   initialSelectedIds: currentSubIds,
   menuOffset: const Offset(40, 12), // from trigger position
   menuOffsetAnimationDuration: const Duration(milliseconds: 120),
-  onFinish: (ids, {required added, required removed}) async {
+  onFinish: ({required added, required removed}) async {
       // 1. Update your data model (e.g. repository) — save-on-close
       await myRepo.add(added);
       await myRepo.remove(removed);
@@ -153,6 +148,32 @@ SubPickerTile<MyItem>(
 **Save-on-close (default):** `SubPickerTile` updates checkboxes while the sub-popup is open and calls `onFinish` once when it closes. That is the library-intended flow for sublist membership.
 
 **Save-on-each-click:** not the default for `SubPickerTile`. Use a nested `SearchAnchorPicker` with `onToggle` (see below) or `OnToggleMode.optimistic`.
+
+## Save-on-close APIs
+
+There are two close callbacks:
+
+```dart
+SearchAnchorPicker<Person>(
+  config: config,
+  initialSelectedIds: selectedIds,
+
+  // Delta save: only user row check/uncheck actions.
+  onFinish: ({required added, required removed}) async {
+    await api.addMemberships(added);
+    await api.removeMemberships(removed);
+  },
+
+  // Replace-all save: the full final selection.
+  onFinishReplaceAll: (finalIds) async {
+    await api.replaceSelection(finalIds);
+  },
+);
+```
+
+Use `onFinish` for normal add/remove APIs. Use `onFinishReplaceAll` only when your backend expects the whole final selection.
+
+If `onFinishReplaceAll` is configured and the final selection is empty, the picker does not save empty on close by default. It shows a confirmation button labeled `Save empty`; customize it with `saveEmptyLabel`, or disable empty replace-all saves with `showSaveEmptyButton: false`.
 
 ## Async `onToggle`
 
@@ -184,7 +205,7 @@ SearchAnchorPicker<Person>(
 
 For **validation** (max items, permissions), keep **`awaitGate`** and return `false` to block the change.
 
-See [`docs/AGENTS.md`](docs/AGENTS.md) for sublist vs main-list patterns and `initialSelectedIds` sync rules.
+Use `SubPickerTile` for nested sublist membership and `onToggle` or root `onFinish` for main-list assignment. `initialSelectedIds` is the caller-owned selection state, independent from the current search page. Server-side filtering is supported: a selected ID missing from `loadItems` is preserved, and `onFinish` only reports IDs the user checked or unchecked from item rows. Bulk header actions like `actions.selectNone()` update pending selection, but they are not remote-delete signals.
 
 ## Client-side vs server-side item loading
 
@@ -201,7 +222,7 @@ PickerConfig<Person>(
 );
 ```
 
-`onFinish(... removed:)` reports only explicit picker removals: user unselects or header code such as `actions.setPending(...)`, `toggleId(...)`, or `selectNone()`. Parent `initialSelectedIds` changes may reseed the final `ids`, but they are not reported as `removed`; this prevents a temporary empty seed from triggering delete APIs.
+`actions.selectNone()` unchecks selected IDs from the current loaded result only, so hidden server-side selections stay pending. Use `onFinishReplaceAll(finalIds)` when you want to save the whole selection as-is, including header actions. Use `onFinish(added:, removed:)` for add/delete APIs; these lists contain only IDs the user checked or unchecked from item rows, not server-side omissions, header actions, or parent seed changes.
 
 ## TODO: 
 headerBuilder: (context, actions) => allUnitsHeader(context, actions, allJsas, ref),

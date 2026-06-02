@@ -74,6 +74,7 @@ void main() {
       mode: PickerMode.multi,
       getKey: (_) => GlobalKey(),
       refresh: () {},
+      visibleIds: const [1, 2, 3],
     );
 
     int finishCallCount = 0;
@@ -96,7 +97,7 @@ void main() {
               2,
             ], // 1, 2 are selected in sub-picker (present in main)
             parentActions: parentActions,
-            onFinish: (ids, {required added, required removed}) async {
+            onFinish: ({required added, required removed}) async {
               finishCallCount++;
               lastAdded = added;
               lastRemoved = removed;

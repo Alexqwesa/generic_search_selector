@@ -234,20 +234,17 @@ class _DemoHomeState extends State<DemoHome> {
                             listA.items,
                             subA1.items,
                           ),
-                          onFinish:
-                              (ids, {required added, required removed}) async {
-                                final addItems = added
-                                    .map((id) => findById(subA1.items, id))
-                                    .whereType<DemoItem>()
-                                    .toList();
+                          onFinish: ({required added, required removed}) async {
+                            final addItems = added
+                                .map((id) => findById(subA1.items, id))
+                                .whereType<DemoItem>()
+                                .toList();
 
-                                setState(() {
-                                  listA.addAll(addItems, same);
-                                  listA.removeWhere(
-                                    (x) => removed.contains(x.id),
-                                  );
-                                });
-                              },
+                            setState(() {
+                              listA.addAll(addItems, same);
+                              listA.removeWhere((x) => removed.contains(x.id));
+                            });
+                          },
                         ),
                         SubPickerTile<DemoItem>(
                           parentActions: actions,
@@ -259,20 +256,17 @@ class _DemoHomeState extends State<DemoHome> {
                             listA.items,
                             subA2.items,
                           ),
-                          onFinish:
-                              (ids, {required added, required removed}) async {
-                                final addItems = added
-                                    .map((id) => findById(subA2.items, id))
-                                    .whereType<DemoItem>()
-                                    .toList();
+                          onFinish: ({required added, required removed}) async {
+                            final addItems = added
+                                .map((id) => findById(subA2.items, id))
+                                .whereType<DemoItem>()
+                                .toList();
 
-                                setState(() {
-                                  listA.addAll(addItems, same);
-                                  listA.removeWhere(
-                                    (x) => removed.contains(x.id),
-                                  );
-                                });
-                              },
+                            setState(() {
+                              listA.addAll(addItems, same);
+                              listA.removeWhere((x) => removed.contains(x.id));
+                            });
+                          },
                         ),
                         const Divider(height: 1),
                         ListTile(
@@ -358,7 +352,7 @@ class _DemoHomeState extends State<DemoHome> {
                           icon: Icons.person_add_alt_1,
                           config: subB1Config,
                           initialSelectedIds: _ids(selectedOnScreenB),
-                          onFinish: (ids, {required added, required removed}) async {
+                          onFinish: ({required added, required removed}) async {
                             setState(() {
                               selectedOnScreenB
                                 ..addAll(added)
@@ -377,16 +371,15 @@ class _DemoHomeState extends State<DemoHome> {
                           icon: Icons.person_add_alt,
                           config: subB2Config,
                           initialSelectedIds: _ids(selectedOnScreenB),
-                          onFinish:
-                              (ids, {required added, required removed}) async {
-                                setState(() {
-                                  selectedOnScreenB
-                                    ..addAll(added)
-                                    ..removeAll(removed);
-                                });
-                                final next = {...actions.pending, ...added};
-                                actions.setPending(next);
-                              },
+                          onFinish: ({required added, required removed}) async {
+                            setState(() {
+                              selectedOnScreenB
+                                ..addAll(added)
+                                ..removeAll(removed);
+                            });
+                            final next = {...actions.pending, ...added};
+                            actions.setPending(next);
+                          },
                         ),
                         const Divider(height: 1),
                         ListTile(

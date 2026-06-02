@@ -24,7 +24,7 @@ Use when editing pickers built with `SearchAnchorPicker` / `SubPickerTile` from
 | UI | Use |
 |----|-----|
 | Pool / sublist membership | `SubPickerTile` + `onFinish` (save-on-close) |
-| Main list assign | `onToggle` or root `onFinish` |
+| Main list assign | `onToggle`, root `onFinish`, or `onFinishReplaceAll` |
 | Async save, checkbox must not freeze | `onToggleMode: OnToggleMode.optimistic` or immediate `return true` + background save |
 | Server-side search / pagination | Treat `loadItems` as display data only; missing IDs are not removals |
 
@@ -35,7 +35,8 @@ Use when editing pickers built with `SearchAnchorPicker` / `SubPickerTile` from
 - `idOf` and `initialSelectedIds` must share **one stable key space** (e.g. don't mix `entity:type:id` with `pool:id`).
 - Don't fix sublist bugs with parent `refreshTick` / listenable alone — check sub-picker pattern first.
 - `loadItems` is **not deletion truth**. Server-side pages may omit selected IDs; do not infer removal from absence.
-- `onFinish(... removed:)` means explicit picker removals only: user unselects or `PickerActions` changes.
+- `onFinish(added:, removed:)` means user item-row changes only; `PickerActions` changes affect `onFinishReplaceAll(finalIds)` but do not appear in `added` / `removed`.
+- Empty `onFinishReplaceAll` saves require the user to press the save-empty button; `showSaveEmptyButton: false` disables empty replace-all saves.
 - Parent `initialSelectedIds` changes can reseed final `ids`, but must not trigger delete APIs from seed diffs. A temporary empty seed from a failed request should not remove anything remotely.
 
 ## Library docs

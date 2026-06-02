@@ -77,8 +77,8 @@ void main() {
                   initialSelectedIds: const [],
                   mode:
                       PickerMode.radio, // Radio mode -> closes itself on select
-                  onFinish: (ids, {required added, required removed}) async {
-                    if (ids.isNotEmpty) {
+                  onFinish: ({required added, required removed}) async {
+                    if (added.isNotEmpty) {
                       // If selection made in sub-picker, CLOSE MAIN PICKER too.
                       mainConfig.close();
                     }

@@ -10,7 +10,7 @@ Rules for agents (and humans) working on this library or integrating it. Consume
 | **`onToggle` on `SearchAnchorPicker`** | Only after **`onToggle` returns `true`** | Inside **`onToggle`** (sync or async — you choose) |
 
 - **Sublist membership** (pool / “add from DB”, intersection with parent list): prefer **`SubPickerTile` + `onFinish`**.
-- **Record assignment on the main list**: use **`onToggle`** (or **`onFinish`** on the root picker if you only persist on close).
+- **Record assignment on the main list**: use **`onToggle`** (or **`onFinish`** / **`onFinishReplaceAll`** on the root picker if you only persist on close).
 - **Async server save in a sublist** without save-on-close: either use **`SubPickerTile` + `onFinish`**, or use **`onToggle`** with **`onToggleMode: OnToggleMode.optimistic`** (or `return true` immediately and persist in the background — see README “Async onToggle”).
 
 The quick README example uses **`onToggle` + sync `setState`**. Nested examples use **`SubPickerTile`**. It is easy to put **`onToggle` + slow `await`** on a sublist and wonder why checkboxes freeze until the future completes.
@@ -41,7 +41,7 @@ There is an intentional split between **class-level comments** and **runtime beh
 ## `SubPickerTile` — save-on-close (default)
 
 - Checkboxes update in-overlay immediately.
-- **`onFinish(ids, added:, removed:)`** runs once when the sub-popup closes.
+- **`onFinish(added:, removed:)`** runs once when the sub-popup closes.
 - With **`parentActions`**: **`removed`** IDs are stripped from parent pending; **`added`** IDs are **not** auto-added to parent pending.
 
 **Save on every click** is **not** the default `SubPickerTile` flow. Options:
@@ -77,9 +77,11 @@ For **validation** (max count, permissions), use **`awaitGate`** and return **`f
 `loadItems` is display/search data, not deletion truth.
 
 - Missing IDs are preserved whether `loadItems` returns a full client-side list or a server-side page.
-- Explicit user unselects still remove IDs from `_pendingN`; `onFinish(... removed:)` reports those IDs.
-- Header code may remove IDs explicitly with `actions.setPending(...)`, `toggleId(...)`, or `selectNone()`.
-- Parent `initialSelectedIds` changes may reseed final `ids`, but they are not reported as `removed`; do not call delete APIs from seed diffs.
+- Explicit user row checks/unchecks still update `_pendingN`; `onFinish(added:, removed:)` reports those IDs.
+- Header code may change final pending IDs with `actions.setPending(...)`, `toggleId(...)`, or `selectNone()`, but those changes are only reflected in `onFinishReplaceAll(finalIds)`, not `added` / `removed`.
+- Parent `initialSelectedIds` changes may reseed final IDs, but they are not reported as `added` / `removed`; do not call add/delete APIs from seed diffs.
+- `actions.selectNone()` removes only IDs from the current loaded result, not hidden server-side selections.
+- Empty `onFinishReplaceAll` saves require the user to press the save-empty button. `showSaveEmptyButton: false` disables empty replace-all saves.
 - If the backend knows an ID was deleted, update parent state / `initialSelectedIds` explicitly after that deletion source succeeds.
 
 ## `PickerActions` (header / sub-pickers)

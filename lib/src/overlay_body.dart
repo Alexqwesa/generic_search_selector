@@ -90,7 +90,7 @@ class OverlayBody<T, K> extends StatefulWidget {
     required this.config,
     required this.onToggleGate,
     this.onToggleMode = OnToggleMode.awaitGate,
-    required this.recordPendingChange,
+    required this.recordUserPendingChange,
     required this.close,
     this.itemBuilder,
   });
@@ -107,7 +107,7 @@ class OverlayBody<T, K> extends StatefulWidget {
 
   final Future<bool> Function(T item, bool nextSelected)? onToggleGate;
   final OnToggleMode onToggleMode;
-  final void Function(Set<K> before, Set<K> after) recordPendingChange;
+  final void Function(Set<K> before, Set<K> after) recordUserPendingChange;
   final void Function([String? reason, bool skipCloseView]) close;
   final Widget Function(
     BuildContext context,
@@ -237,7 +237,7 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                 }
 
                                 final nextPending = next ? {id} : <K>{};
-                                widget.recordPendingChange(
+                                widget.recordUserPendingChange(
                                   current,
                                   nextPending,
                                 );
@@ -280,7 +280,7 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                               final revertTo = {...current};
                               final s = {...current};
                               next ? s.add(id) : s.remove(id);
-                              widget.recordPendingChange(current, s);
+                              widget.recordUserPendingChange(current, s);
                               widget.pendingN.value = s;
 
                               if (useOptimistic) {
@@ -290,7 +290,7 @@ class _OverlayBodyState<T, K> extends State<OverlayBody<T, K>> {
                                     next,
                                   );
                                   if (!ok && mounted) {
-                                    widget.recordPendingChange(s, revertTo);
+                                    widget.recordUserPendingChange(s, revertTo);
                                     widget.pendingN.value = revertTo;
                                   }
                                 }());

@@ -27,6 +27,9 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
     this.onToggle,
     this.onToggleMode = OnToggleMode.awaitGate,
     this.onFinish,
+    this.onFinishReplaceAll,
+    this.showSaveEmptyButton = true,
+    this.saveEmptyLabel = 'Save empty',
     this.searchController,
     this.triggerBuilder,
     this.triggerChild,
@@ -57,8 +60,18 @@ class GenericSearchAnchorPicker<T, K> extends StatefulWidget {
   /// Whether [onToggle] runs before or after in-overlay checkbox updates.
   final OnToggleMode onToggleMode;
 
-  /// Called once when overlay closes (diff vs open snapshot).
+  /// Called once when overlay closes with user row-toggle changes.
   final GenericOnFinish<K>? onFinish;
+
+  /// Called once when overlay closes with the full final selection.
+  ///
+  /// If the final selection is empty, this callback runs only after the user
+  /// explicitly presses the save-empty button. Set [showSaveEmptyButton] to
+  /// false to disable empty replace-all saves.
+  final GenericOnFinishReplaceAll<K>? onFinishReplaceAll;
+
+  final bool showSaveEmptyButton;
+  final String saveEmptyLabel;
 
   final SearchController? searchController;
 
@@ -123,6 +136,9 @@ class SearchAnchorPicker<T> extends GenericSearchAnchorPicker<T, int> {
     super.onToggle,
     super.onToggleMode,
     super.onFinish,
+    super.onFinishReplaceAll,
+    super.showSaveEmptyButton,
+    super.saveEmptyLabel,
     super.searchController,
     super.triggerBuilder,
     super.triggerChild,
@@ -163,7 +179,9 @@ class _GenericSearchAnchorPickerState<T, K>
   );
 
   Set<K> _openedSnapshot = <K>{};
+  final Set<K> _explicitlyAdded = <K>{};
   final Set<K> _explicitlyRemoved = <K>{};
+  bool _allowReplaceAllEmpty = false;
   bool _open = false;
 
   int _tick = 0;
@@ -282,7 +300,9 @@ class _GenericSearchAnchorPickerState<T, K>
 
   void _onOpen() {
     _openedSnapshot = widget.initialSelectedIds.toSet();
+    _explicitlyAdded.clear();
     _explicitlyRemoved.clear();
+    _allowReplaceAllEmpty = false;
     _pendingN.value = {..._openedSnapshot};
 
     _stableIds = <K>[];
@@ -321,7 +341,9 @@ class _GenericSearchAnchorPickerState<T, K>
     final before = _openedSnapshot;
     final after = _pendingN.value;
 
-    final added = after.difference(before).toList();
+    final added = _explicitlyAdded
+        .intersection(after.difference(before))
+        .toList();
     final removed = _explicitlyRemoved
         .intersection(before.difference(after))
         .toList();
@@ -337,7 +359,12 @@ class _GenericSearchAnchorPickerState<T, K>
       _headerKeys.clear();
 
       if (widget.onFinish != null) {
-        await widget.onFinish!(after.toList(), added: added, removed: removed);
+        await widget.onFinish!(added: added, removed: removed);
+      }
+
+      if (widget.onFinishReplaceAll != null &&
+          (after.isNotEmpty || _allowReplaceAllEmpty)) {
+        await widget.onFinishReplaceAll!(after.toList());
       }
 
       if (!mounted) return;
@@ -474,7 +501,7 @@ class _GenericSearchAnchorPickerState<T, K>
           mode: widget.mode,
           getKey: _getKey,
           refresh: _reload,
-          recordPendingChange: _recordPendingChange,
+          visibleIds: items.map(widget.config.idOf),
         );
 
         final header = widget.headerBuilder != null
@@ -497,7 +524,7 @@ class _GenericSearchAnchorPickerState<T, K>
           config: widget.config,
           onToggleGate: widget.onToggle,
           onToggleMode: widget.onToggleMode,
-          recordPendingChange: _recordPendingChange,
+          recordUserPendingChange: _recordUserPendingChange,
           close: _close,
           itemBuilder: widget.itemBuilder,
         );
@@ -505,9 +532,18 @@ class _GenericSearchAnchorPickerState<T, K>
     );
   }
 
-  void _recordPendingChange(Set<K> before, Set<K> after) {
-    _explicitlyRemoved.addAll(before.difference(after));
-    _explicitlyRemoved.removeAll(after);
+  void _recordUserPendingChange(Set<K> before, Set<K> after) {
+    final added = after.difference(before);
+    final removed = before.difference(after);
+    _explicitlyAdded.addAll(added);
+    _explicitlyAdded.removeAll(removed);
+    _explicitlyRemoved.addAll(removed);
+    _explicitlyRemoved.removeAll(added);
+  }
+
+  void _saveEmptyAndClose() {
+    _allowReplaceAllEmpty = true;
+    _close('saveEmpty');
   }
 
   Widget _buildSearchField() {
@@ -574,10 +610,31 @@ class _GenericSearchAnchorPickerState<T, K>
           children: [
             _buildSearchField(),
             const Divider(height: 1),
+            _buildSaveEmptyButton(),
             Flexible(child: _buildOverlayView()),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSaveEmptyButton() {
+    if (widget.onFinishReplaceAll == null || !widget.showSaveEmptyButton) {
+      return const SizedBox.shrink();
+    }
+
+    return ValueListenableBuilder<Set<K>>(
+      valueListenable: _pendingN,
+      builder: (context, pending, _) {
+        if (pending.isNotEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: FilledButton.tonal(
+            onPressed: _saveEmptyAndClose,
+            child: Text(widget.saveEmptyLabel),
+          ),
+        );
+      },
     );
   }
 

@@ -214,13 +214,17 @@ class PickerConfig<T> extends GenericPickerConfig<T, int> {
 }
 
 typedef GenericOnFinish<K> =
-    Future<void> Function(
-      List<K> finalIds, {
-      required List<K> added,
-      required List<K> removed,
-    });
+    Future<void> Function({required List<K> added, required List<K> removed});
+
+/// Called when the popup closes with the full final in-picker selection.
+///
+/// This is a replace-all persistence API. If the final selection is empty,
+/// [GenericSearchAnchorPicker] requires explicit empty-save confirmation before
+/// calling this callback.
+typedef GenericOnFinishReplaceAll<K> = Future<void> Function(List<K> finalIds);
 
 typedef OnFinish = GenericOnFinish<int>;
+typedef OnFinishReplaceAll = GenericOnFinishReplaceAll<int>;
 
 enum PickerMode { multi, radio, radioToggle }
 
@@ -257,31 +261,37 @@ class GenericPickerActions<T, K> {
     required this.mode,
     required this.getKey,
     required VoidCallback refresh,
-    void Function(Set<K> before, Set<K> after)? recordPendingChange,
+    required Iterable<K> visibleIds,
   }) : _close = close,
        _refresh = refresh,
-       _recordPendingChange = recordPendingChange;
+       _visibleIds = visibleIds;
 
   final ValueNotifier<Set<K>> pendingN;
   final K Function(T) idOf;
   final void Function([String? reason]) _close;
   final GlobalKey Function(Object id) getKey;
   final VoidCallback _refresh;
-  final void Function(Set<K> before, Set<K> after)? _recordPendingChange;
+  final Iterable<K> _visibleIds;
   final PickerMode mode;
 
   Set<K> get pending => pendingN.value;
 
   void setPending(Set<K> ids) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _recordPendingChange?.call(pendingN.value, ids);
       pendingN.value = ids;
     });
   }
 
   void selectAll(Iterable<K> ids) => setPending(ids.toSet());
 
-  void selectNone() => setPending(<K>{});
+  /// Unselects IDs from the currently loaded item list only.
+  ///
+  /// This keeps server-side pagination/search safe: selected IDs that are not
+  /// present in the current loaded result stay pending.
+  void selectNone() {
+    final visible = _visibleIds.toSet();
+    setPending({...pending}..removeAll(visible));
+  }
 
   void toggleId(K id, bool next) {
     final s = {...pending};
@@ -310,7 +320,7 @@ class PickerActions<T> extends GenericPickerActions<T, int> {
     required super.mode,
     required super.getKey,
     required super.refresh,
-    super.recordPendingChange,
+    required super.visibleIds,
   });
 }
 

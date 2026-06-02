@@ -20,13 +20,16 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
     this.icon,
     this.parentActions,
     this.onFinish,
+    this.onFinishReplaceAll,
+    this.showSaveEmptyButton = true,
+    this.saveEmptyLabel = 'Save empty',
     this.mode = PickerMode.multi,
     this.leading,
     this.subtitle,
     this.trailing,
     this.triggerBuilder,
     this.itemBuilder,
-    this.menuOffset = const Offset(30,30),
+    this.menuOffset = const Offset(30, 30),
     this.menuOffsetAnimationDuration = const Duration(milliseconds: 120),
   }) : assert(title != null || triggerBuilder != null);
 
@@ -41,9 +44,8 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
 
   /// Optional parent actions to automatically sync changes to.
   ///
-  /// If provided:
-  /// - items added in sub-picker are added to parent pending selection.
-  /// - items removed in sub-picker are removed from parent pending selection.
+  /// If provided, items the user unchecks in the sub-picker are removed from
+  /// parent pending selection.
   final GenericPickerActions<T, K>? parentActions;
 
   /// Icon to show leading the tile (convenience for [leading]).
@@ -58,6 +60,11 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
   /// Callback when sub-picker closes.
   /// Run AFTER parent synchronization (if [parentActions] is provided).
   final GenericOnFinish<K>? onFinish;
+
+  final GenericOnFinishReplaceAll<K>? onFinishReplaceAll;
+
+  final bool showSaveEmptyButton;
+  final String saveEmptyLabel;
 
   /// Optional builder for custom trigger widget.
   ///
@@ -82,7 +89,7 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
     return GenericSearchAnchorPicker<T, K>(
       config: config,
       initialSelectedIds: initialSelectedIds,
-      onFinish: (ids, {required added, required removed}) async {
+      onFinish: ({required added, required removed}) async {
         if (parentActions != null) {
           // Sync behavior:
           // 1. If items are removed from sub-list (meaning removed from main list),
@@ -92,9 +99,12 @@ class GenericSubPickerTile<T, K> extends StatelessWidget {
           parentActions!.setPending(next);
         }
         if (onFinish != null) {
-          await onFinish!(ids, added: added, removed: removed);
+          await onFinish!(added: added, removed: removed);
         }
       },
+      onFinishReplaceAll: onFinishReplaceAll,
+      showSaveEmptyButton: showSaveEmptyButton,
+      saveEmptyLabel: saveEmptyLabel,
       mode: mode,
       itemBuilder: itemBuilder,
       menuOffset: menuOffset,
@@ -128,6 +138,9 @@ class SubPickerTile<T> extends GenericSubPickerTile<T, int> {
     super.icon,
     super.parentActions,
     super.onFinish,
+    super.onFinishReplaceAll,
+    super.showSaveEmptyButton,
+    super.saveEmptyLabel,
     super.mode,
     super.leading,
     super.subtitle,
