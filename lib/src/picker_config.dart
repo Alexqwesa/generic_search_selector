@@ -262,9 +262,15 @@ class GenericPickerActions<T, K> {
     required this.getKey,
     required VoidCallback refresh,
     required Iterable<K> visibleIds,
+    required Iterable<K> Function() loadedIds,
+    required Iterable<K> Function() filteredIds,
+    required void Function(Set<K> before, Set<K> after) recordDelta,
   }) : _close = close,
        _refresh = refresh,
-       _visibleIds = visibleIds;
+       _visibleIds = visibleIds,
+       _loadedIds = loadedIds,
+       _filteredIds = filteredIds,
+       _recordDelta = recordDelta;
 
   final ValueNotifier<Set<K>> pendingN;
   final K Function(T) idOf;
@@ -272,6 +278,9 @@ class GenericPickerActions<T, K> {
   final GlobalKey Function(Object id) getKey;
   final VoidCallback _refresh;
   final Iterable<K> _visibleIds;
+  final Iterable<K> Function() _loadedIds;
+  final Iterable<K> Function() _filteredIds;
+  final void Function(Set<K> before, Set<K> after) _recordDelta;
   final PickerMode mode;
 
   Set<K> get pending => pendingN.value;
@@ -284,19 +293,54 @@ class GenericPickerActions<T, K> {
 
   void selectAll(Iterable<K> ids) => setPending(ids.toSet());
 
+  void selectLoaded() => _addIds(_loadedIds());
+
+  void clearLoaded() => _removeIds(_loadedIds());
+
+  void selectFiltered() => _addIds(_filteredIds());
+
+  void clearFiltered() => _removeIds(_filteredIds());
+
   /// Unselects IDs from the currently loaded item list only.
   ///
   /// This keeps server-side pagination/search safe: selected IDs that are not
   /// present in the current loaded result stay pending.
-  void selectNone() {
-    final visible = _visibleIds.toSet();
-    setPending({...pending}..removeAll(visible));
-  }
+  void selectNone() => clearLoaded();
+
+  void selectLoadedAsDelta() => _addIds(_loadedIds(), asDelta: true);
+
+  void clearLoadedAsDelta() => _removeIds(_loadedIds(), asDelta: true);
+
+  void selectFilteredAsDelta() => _addIds(_filteredIds(), asDelta: true);
+
+  void clearFilteredAsDelta() => _removeIds(_filteredIds(), asDelta: true);
 
   void toggleId(K id, bool next) {
     final s = {...pending};
     next ? s.add(id) : s.remove(id);
     setPending(s);
+  }
+
+  void toggleIdAsDelta(K id, bool next) {
+    final s = {...pending};
+    next ? s.add(id) : s.remove(id);
+    _setPending(s, asDelta: true);
+  }
+
+  void _addIds(Iterable<K> ids, {bool asDelta = false}) {
+    _setPending({...pending, ...ids}, asDelta: asDelta);
+  }
+
+  void _removeIds(Iterable<K> ids, {bool asDelta = false}) {
+    final remove = ids.toSet();
+    _setPending({...pending}..removeAll(remove), asDelta: asDelta);
+  }
+
+  void _setPending(Set<K> ids, {required bool asDelta}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (asDelta) _recordDelta(pendingN.value, ids);
+      pendingN.value = ids;
+    });
   }
 
   void refresh() {
@@ -321,6 +365,9 @@ class PickerActions<T> extends GenericPickerActions<T, int> {
     required super.getKey,
     required super.refresh,
     required super.visibleIds,
+    required super.loadedIds,
+    required super.filteredIds,
+    required super.recordDelta,
   });
 }
 

@@ -75,6 +75,9 @@ void main() {
       getKey: (_) => GlobalKey(),
       refresh: () {},
       visibleIds: const [1, 2, 3],
+      loadedIds: () => const [1, 2, 3],
+      filteredIds: () => const [1, 2, 3],
+      recordDelta: (_, _) {},
     );
 
     int finishCallCount = 0;

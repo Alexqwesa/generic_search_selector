@@ -78,7 +78,7 @@ The popup header uses a real Material `SearchBar` rather than a plain `TextField
 
 * **Client-side lists**: Missing selected IDs remain pending until the user explicitly removes them or caller state changes.
 * **Server-side lists**: Search pages can omit valid selections without accidentally dropping them.
-* **User intent**: `onFinish(added:, removed:)` is produced only by user item-row checks/unchecks. `PickerActions` and parent `initialSelectedIds` changes can update `onFinishReplaceAll(finalIds)`, but do not become delta entries.
+* **User intent**: `onFinish(added:, removed:)` is produced by user item-row checks/unchecks and explicit `PickerActions` `*AsDelta()` helpers. Pending-only actions and parent `initialSelectedIds` changes can update `onFinishReplaceAll(finalIds)`, but do not become delta entries.
 * **Replace-all safety**: Empty `onFinishReplaceAll` saves require explicit user confirmation with the save-empty button, or are disabled when `showSaveEmptyButton` is false.
 
 ## Conclusion

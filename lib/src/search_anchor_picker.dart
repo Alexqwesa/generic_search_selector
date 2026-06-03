@@ -502,6 +502,9 @@ class _GenericSearchAnchorPickerState<T, K>
           getKey: _getKey,
           refresh: _reload,
           visibleIds: items.map(widget.config.idOf),
+          loadedIds: () => (_itemsSnapshot ?? <T>[]).map(widget.config.idOf),
+          filteredIds: _filteredLoadedIds,
+          recordDelta: _recordUserPendingChange,
         );
 
         final header = widget.headerBuilder != null
@@ -530,6 +533,21 @@ class _GenericSearchAnchorPickerState<T, K>
         );
       },
     );
+  }
+
+  Iterable<K> _filteredLoadedIds() {
+    final items = _itemsSnapshot ?? <T>[];
+    final q = _ctrl.text.trim().toLowerCase();
+    if (q.isEmpty) return items.map(widget.config.idOf);
+
+    return items
+        .where((item) {
+          for (final term in widget.config.searchTermsOf(item)) {
+            if (term.toLowerCase().contains(q)) return true;
+          }
+          return false;
+        })
+        .map(widget.config.idOf);
   }
 
   void _recordUserPendingChange(Set<K> before, Set<K> after) {

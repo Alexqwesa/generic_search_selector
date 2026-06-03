@@ -379,6 +379,319 @@ void main() {
     expect(removedIds, isEmpty);
   });
 
+  testWidgets('clearLoaded changes final ids without reporting removed ids', (
+    tester,
+  ) async {
+    List<int> finalIds = [];
+    List<int> removedIds = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig<int>(
+              loadItems: (_) async => [2, 4],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [1, 2, 3],
+            headerBuilder: (context, actions, _) {
+              return [
+                TextButton(
+                  onPressed: actions.clearLoaded,
+                  child: const Text('Clear loaded'),
+                ),
+              ];
+            },
+            triggerBuilder: (_, open, __) =>
+                ElevatedButton(onPressed: open, child: const Text('Open')),
+            onFinish: ({required added, required removed}) async {
+              removedIds = removed;
+            },
+            onFinishReplaceAll: (ids) async {
+              finalIds = ids;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear loaded'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(finalIds.toSet(), {1, 3});
+    expect(removedIds, isEmpty);
+  });
+
+  testWidgets('clearLoadedAsDelta reports loaded selected ids as removed', (
+    tester,
+  ) async {
+    List<int> finalIds = [];
+    List<int> removedIds = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig<int>(
+              loadItems: (_) async => [2, 4],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [1, 2, 3],
+            headerBuilder: (context, actions, _) {
+              return [
+                TextButton(
+                  onPressed: actions.clearLoadedAsDelta,
+                  child: const Text('Clear loaded delta'),
+                ),
+              ];
+            },
+            triggerBuilder: (_, open, __) =>
+                ElevatedButton(onPressed: open, child: const Text('Open')),
+            onFinish: ({required added, required removed}) async {
+              removedIds = removed;
+            },
+            onFinishReplaceAll: (ids) async {
+              finalIds = ids;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear loaded delta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(finalIds.toSet(), {1, 3});
+    expect(removedIds, [2]);
+  });
+
+  testWidgets('selectLoadedAsDelta reports loaded unselected ids as added', (
+    tester,
+  ) async {
+    List<int> finalIds = [];
+    List<int> addedIds = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig<int>(
+              loadItems: (_) async => [2, 4],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [1, 2, 3],
+            headerBuilder: (context, actions, _) {
+              return [
+                TextButton(
+                  onPressed: actions.selectLoadedAsDelta,
+                  child: const Text('Select loaded delta'),
+                ),
+              ];
+            },
+            triggerBuilder: (_, open, __) =>
+                ElevatedButton(onPressed: open, child: const Text('Open')),
+            onFinish: ({required added, required removed}) async {
+              addedIds = added;
+            },
+            onFinishReplaceAll: (ids) async {
+              finalIds = ids;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select loaded delta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(finalIds.toSet(), {1, 2, 3, 4});
+    expect(addedIds, [4]);
+  });
+
+  testWidgets('clearFilteredAsDelta reports only filtered selected ids', (
+    tester,
+  ) async {
+    List<int> finalIds = [];
+    List<int> removedIds = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig<int>(
+              loadItems: (_) async => [1, 2, 3],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [1, 2, 3],
+            headerBuilder: (context, actions, _) {
+              return [
+                TextButton(
+                  onPressed: actions.clearFilteredAsDelta,
+                  child: const Text('Clear filtered delta'),
+                ),
+              ];
+            },
+            triggerBuilder: (_, open, __) =>
+                ElevatedButton(onPressed: open, child: const Text('Open')),
+            onFinish: ({required added, required removed}) async {
+              removedIds = removed;
+            },
+            onFinishReplaceAll: (ids) async {
+              finalIds = ids;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(SearchBar), 'Item 2');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Clear filtered delta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(finalIds.toSet(), {1, 3});
+    expect(removedIds, [2]);
+  });
+
+  testWidgets('selectFilteredAsDelta reports only filtered unselected ids', (
+    tester,
+  ) async {
+    List<int> finalIds = [];
+    List<int> addedIds = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig<int>(
+              loadItems: (_) async => [1, 2, 3],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [1],
+            headerBuilder: (context, actions, _) {
+              return [
+                TextButton(
+                  onPressed: actions.selectFilteredAsDelta,
+                  child: const Text('Select filtered delta'),
+                ),
+              ];
+            },
+            triggerBuilder: (_, open, __) =>
+                ElevatedButton(onPressed: open, child: const Text('Open')),
+            onFinish: ({required added, required removed}) async {
+              addedIds = added;
+            },
+            onFinishReplaceAll: (ids) async {
+              finalIds = ids;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(SearchBar), 'Item 3');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Select filtered delta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(finalIds.toSet(), {1, 3});
+    expect(addedIds, [3]);
+  });
+
+  testWidgets('toggleIdAsDelta reports delta while toggleId does not', (
+    tester,
+  ) async {
+    List<int> finalIds = [];
+    List<int> addedIds = [];
+    List<int> removedIds = [];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SearchAnchorPicker<int>(
+            config: PickerConfig<int>(
+              loadItems: (_) async => [1, 2, 3],
+              idOf: (i) => i,
+              labelOf: (i) => 'Item $i',
+              searchTermsOf: (i) => ['Item $i'],
+            ),
+            initialSelectedIds: const [1],
+            headerBuilder: (context, actions, _) {
+              return [
+                TextButton(
+                  onPressed: () => actions.toggleId(2, true),
+                  child: const Text('Toggle pending'),
+                ),
+                TextButton(
+                  onPressed: () => actions.toggleIdAsDelta(3, true),
+                  child: const Text('Toggle add delta'),
+                ),
+                TextButton(
+                  onPressed: () => actions.toggleIdAsDelta(1, false),
+                  child: const Text('Toggle remove delta'),
+                ),
+              ];
+            },
+            triggerBuilder: (_, open, __) =>
+                ElevatedButton(onPressed: open, child: const Text('Open')),
+            onFinish: ({required added, required removed}) async {
+              addedIds = added;
+              removedIds = removed;
+            },
+            onFinishReplaceAll: (ids) async {
+              finalIds = ids;
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Toggle pending'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Toggle add delta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Toggle remove delta'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.arrow_back));
+    await tester.pumpAndSettle();
+
+    expect(finalIds.toSet(), {2, 3});
+    expect(addedIds, [3]);
+    expect(removedIds, [1]);
+  });
+
   testWidgets('empty replace-all can be disabled explicitly', (tester) async {
     var replaceAllCalled = false;
 
