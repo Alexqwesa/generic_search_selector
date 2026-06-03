@@ -277,7 +277,7 @@ class _DemoHomeState extends State<DemoHome> {
                             setState(() => selectedOnScreenA.clear());
 
                             // 2) clear overlay pending selection NOW (immediate checkbox repaint)
-                            actions.selectNone();
+                            actions.pendingClearLoaded();
                           },
                         ),
                         const Divider(height: 1),
@@ -387,7 +387,7 @@ class _DemoHomeState extends State<DemoHome> {
                           title: const Text('Clear screen selection B'),
                           onTap: () {
                             setState(() => selectedOnScreenB.clear());
-                            actions.selectNone();
+                            actions.pendingClearLoaded();
                           },
                         ),
                         const Divider(height: 1),

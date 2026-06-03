@@ -205,7 +205,7 @@ SearchAnchorPicker<Person>(
 
 For **validation** (max items, permissions), keep **`awaitGate`** and return `false` to block the change.
 
-Use `SubPickerTile` for nested sublist membership and `onToggle` or root `onFinish` for main-list assignment. `initialSelectedIds` is the caller-owned selection state, independent from the current search page. Server-side filtering is supported: a selected ID missing from `loadItems` is preserved, and `onFinish` only reports IDs the user checked or unchecked from item rows. Safe bulk header actions like `actions.clearLoaded()` update pending selection without producing add/delete deltas; use `*AsDelta()` helpers for explicit bulk add/remove intent.
+Use `SubPickerTile` for nested sublist membership and `onToggle` or root `onFinish` for main-list assignment. `initialSelectedIds` is the caller-owned selection state, independent from the current search page. Server-side filtering is supported: a selected ID missing from `loadItems` is preserved, and `onFinish` only reports IDs the user checked or unchecked from item rows. Safe bulk header actions like `actions.pendingClearLoaded()` update pending selection without producing add/delete deltas; use `*AsDelta()` helpers for explicit bulk add/remove intent.
 
 ## Client-side vs server-side item loading
 
@@ -222,7 +222,7 @@ PickerConfig<Person>(
 );
 ```
 
-`actions.selectNone()` remains as a compatibility alias for `actions.clearLoaded()`: it unchecks selected IDs from the current loaded result only, so hidden server-side selections stay pending. Prefer the clearer names for new code: `clearLoaded()` / `selectLoaded()` for the current loaded result and `clearFiltered()` / `selectFiltered()` for rows matching the current search query. These pending-only helpers do not populate `added` / `removed`.
+Use `pendingClearLoaded()` / `pendingSelectLoaded()` for the current loaded result and `pendingClearFiltered()` / `pendingSelectFiltered()` for rows matching the current search query. These pending-only helpers do not populate `added` / `removed`, and hidden server-side selections stay pending unless they are in the current loaded result.
 
 Use explicit delta helpers when a header button is meant to behave like add/remove intent: `clearLoadedAsDelta()`, `selectLoadedAsDelta()`, `clearFilteredAsDelta()`, `selectFilteredAsDelta()`, or `toggleIdAsDelta(id, next)`. Use `onFinishReplaceAll(finalIds)` when you want to save the whole selection as-is. Bulk helpers do not run row-level `unselectBehavior`; add your own confirmation in the header if bulk removal needs warnings.
 

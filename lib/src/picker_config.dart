@@ -293,19 +293,13 @@ class GenericPickerActions<T, K> {
 
   void selectAll(Iterable<K> ids) => setPending(ids.toSet());
 
-  void selectLoaded() => _addIds(_loadedIds());
+  void pendingSelectLoaded() => _addIds(_loadedIds());
 
-  void clearLoaded() => _removeIds(_loadedIds());
+  void pendingClearLoaded() => _removeIds(_loadedIds());
 
-  void selectFiltered() => _addIds(_filteredIds());
+  void pendingSelectFiltered() => _addIds(_filteredIds());
 
-  void clearFiltered() => _removeIds(_filteredIds());
-
-  /// Unselects IDs from the currently loaded item list only.
-  ///
-  /// This keeps server-side pagination/search safe: selected IDs that are not
-  /// present in the current loaded result stay pending.
-  void selectNone() => clearLoaded();
+  void pendingClearFiltered() => _removeIds(_filteredIds());
 
   void selectLoadedAsDelta() => _addIds(_loadedIds(), asDelta: true);
 

@@ -78,10 +78,10 @@ For **validation** (max count, permissions), use **`awaitGate`** and return **`f
 
 - Missing IDs are preserved whether `loadItems` returns a full client-side list or a server-side page.
 - Explicit user row checks/unchecks still update `_pendingN`; `onFinish(added:, removed:)` reports those IDs.
-- Header code may change final pending IDs with `actions.setPending(...)`, `toggleId(...)`, `clearLoaded()`, `clearFiltered()`, `selectLoaded()`, or `selectFiltered()`, but those changes are only reflected in `onFinishReplaceAll(finalIds)`, not `added` / `removed`.
+- Header code may change final pending IDs with `actions.setPending(...)`, `toggleId(...)`, `pendingClearLoaded()`, `pendingClearFiltered()`, `pendingSelectLoaded()`, or `pendingSelectFiltered()`, but those changes are only reflected in `onFinishReplaceAll(finalIds)`, not `added` / `removed`.
 - Header code may intentionally emit deltas with `toggleIdAsDelta(...)`, `clearLoadedAsDelta()`, `clearFilteredAsDelta()`, `selectLoadedAsDelta()`, or `selectFilteredAsDelta()`.
 - Parent `initialSelectedIds` changes may reseed final IDs, but they are not reported as `added` / `removed`; do not call add/delete APIs from seed diffs.
-- `actions.selectNone()` is a compatibility alias for `clearLoaded()` and removes only IDs from the current loaded result, not hidden server-side selections.
+- `actions.pendingClearLoaded()` removes only IDs from the current loaded result, not hidden server-side selections.
 - Bulk helpers do not run row-level `unselectBehavior`; header code owns any bulk confirmation/warning UX.
 - Empty `onFinishReplaceAll` saves require the user to press the save-empty button. `showSaveEmptyButton: false` disables empty replace-all saves.
 - If the backend knows an ID was deleted, update parent state / `initialSelectedIds` explicitly after that deletion source succeeds.

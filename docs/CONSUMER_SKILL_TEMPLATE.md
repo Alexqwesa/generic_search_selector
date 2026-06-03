@@ -36,7 +36,7 @@ Use when editing pickers built with `SearchAnchorPicker` / `SubPickerTile` from
 - Don't fix sublist bugs with parent `refreshTick` / listenable alone — check sub-picker pattern first.
 - `loadItems` is **not deletion truth**. Server-side pages may omit selected IDs; do not infer removal from absence.
 - `onFinish(added:, removed:)` means user item-row changes only; `PickerActions` changes affect `onFinishReplaceAll(finalIds)` but do not appear in `added` / `removed`.
-- Use `clearLoaded()` / `clearFiltered()` for safe pending-only bulk UI; use `*AsDelta()` helpers only for explicit bulk add/remove persistence.
+- Use `pendingClearLoaded()` / `pendingClearFiltered()` for safe pending-only bulk UI; use `*AsDelta()` helpers only for explicit bulk add/remove persistence.
 - Empty `onFinishReplaceAll` saves require the user to press the save-empty button; `showSaveEmptyButton: false` disables empty replace-all saves.
 - Parent `initialSelectedIds` changes can reseed final `ids`, but must not trigger delete APIs from seed diffs. A temporary empty seed from a failed request should not remove anything remotely.
 

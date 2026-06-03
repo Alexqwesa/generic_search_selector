@@ -301,7 +301,7 @@ void main() {
             headerBuilder: (context, actions, _) {
               return [
                 TextButton(
-                  onPressed: actions.selectNone,
+                  onPressed: actions.pendingClearLoaded,
                   child: const Text('Clear from header'),
                 ),
               ];
@@ -330,7 +330,7 @@ void main() {
     expect(removedIds, isEmpty);
   });
 
-  testWidgets('selectNone preserves selected ids outside current loaded list', (
+  testWidgets('pendingClearLoaded preserves ids outside current loaded list', (
     tester,
   ) async {
     List<int> finalIds = [];
@@ -350,7 +350,7 @@ void main() {
             headerBuilder: (context, actions, _) {
               return [
                 TextButton(
-                  onPressed: actions.selectNone,
+                  onPressed: actions.pendingClearLoaded,
                   child: const Text('Clear current list'),
                 ),
               ];
@@ -379,7 +379,7 @@ void main() {
     expect(removedIds, isEmpty);
   });
 
-  testWidgets('clearLoaded changes final ids without reporting removed ids', (
+  testWidgets('pendingClearLoaded changes final ids without deltas', (
     tester,
   ) async {
     List<int> finalIds = [];
@@ -399,7 +399,7 @@ void main() {
             headerBuilder: (context, actions, _) {
               return [
                 TextButton(
-                  onPressed: actions.clearLoaded,
+                  onPressed: actions.pendingClearLoaded,
                   child: const Text('Clear loaded'),
                 ),
               ];
